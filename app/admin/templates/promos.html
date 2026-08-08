@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Промокоды</h2>
+<div class="card">
+<form method="post" action="/promos">
+  <label>Код <input name="code" required></label>
+  <label>Скидка % <input type="number" name="discount_percent" min="1" max="100"></label>
+  <label>Или скидка в Stars <input type="number" name="discount_stars" min="1"></label>
+  <label>Максимум активаций (пусто = без лимита) <input type="number" name="max_activations"></label>
+  <label>Лимит на пользователя <input type="number" name="per_user_limit" value="1"></label>
+  <label>Минимальная сумма заказа ⭐ <input type="number" name="min_order_stars" value="0"></label>
+  <label>Действует с (ГГГГ-ММ-ДД) <input name="starts_at"></label>
+  <label>Действует до <input name="ends_at"></label>
+  <button>Создать</button>
+</form>
+</div>
+<table>
+<tr><th>Код</th><th>Скидка</th><th>Лимиты</th><th>Период</th><th>Активен</th><th></th></tr>
+{% for p in promos %}
+<tr>
+  <td>{{ p.code }}</td>
+  <td>{{ p.discount_percent ~ "%" if p.discount_percent else (p.discount_stars ~ " ⭐" if p.discount_stars else "—") }}</td>
+  <td>{{ p.max_activations or "∞" }} / {{ p.per_user_limit }} на чел., мин. {{ p.min_order_stars }} ⭐</td>
+  <td>{{ p.starts_at.strftime("%d.%m.%y") if p.starts_at else "…" }} — {{ p.ends_at.strftime("%d.%m.%y") if p.ends_at else "…" }}</td>
+  <td>{{ "✅" if p.is_active else "—" }}</td>
+  <td><form class="inline" method="post" action="/promos/{{ p.id }}/toggle"><button>{{ "Выключить" if p.is_active else "Включить" }}</button></form></td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Пользователи</h2>
+<form method="get"><input name="q" value="{{ q }}" placeholder="Telegram ID или username" style="width:300px;display:inline-block"> <button>Найти</button></form>
+<table>
+<tr><th>ID</th><th>Username</th><th>Имя</th><th>Регистрация</th><th>Активность</th>
+    <th>Рассылка</th><th>Блок бота</th><th>Бан</th><th></th></tr>
+{% for u in users %}
+<tr>
+  <td>{{ u.id }}</td>
+  <td>{{ u.username or "—" }}</td>
+  <td>{{ u.first_name or "—" }}</td>
+  <td>{{ u.created_at.strftime("%d.%m.%Y") }}</td>
+  <td>{{ u.last_active_at.strftime("%d.%m.%Y") }}</td>
+  <td>{{ "✅" if u.subscribed else "🔕" }}</td>
+  <td>{{ "🚫" if u.is_blocked_bot else "—" }}</td>
+  <td>{{ "⛔" if u.is_banned else "—" }}</td>
+  <td>
+    <a href="/orders?status=&q={{ u.id }}">заказы</a>
+    <form class="inline" method="post" action="/users/{{ u.id }}/toggle_ban">
+      <button>{{ "Разбан" if u.is_banned else "Бан" }}</button></form>
+    <form class="inline" method="post" action="/users/{{ u.id }}/message">
+      <input name="text" placeholder="Сообщение" style="width:160px;display:inline-block">
+      <button>➤</button></form>
+  </td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

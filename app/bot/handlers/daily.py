@@ -1,0 +1,62 @@
+"""Бесплатная карта дня: 1 карта в сутки (UTC+3), повторный запрос — та же карта."""
+from aiogram import Router
+from aiogram.types import Message
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.ai import budget, gemini
+from app.db.models import AIRequest, User
+from app.services.daily import get_or_create_daily_card
+from app.services.errors import log_error
+from app.services.texts import get_setting
+
+router = Router()
+
+
+async def is_daily_button(message: Message, session: AsyncSession) -> bool:
+    return message.text == await get_setting(session, "btn_daily")
+
+
+@router.message(is_daily_button)
+async def daily_card(message: Message, session: AsyncSession, db_user: User):
+    card, created = await get_or_create_daily_card(session, db_user.id)
+    header = (f"🃏 Карта дня: <b>{card.card.name_ru}</b>"
+              f"{' (перевёрнутая)' if card.is_reversed else ''}")
+
+    if not created and card.text:
+        await message.answer(f"{header}\n\n{card.text}\n\n<i>Новая карта будет доступна завтра.</i>")
+        return
+
+    text = ""
+    if (await get_setting(session, "daily_ai_enabled")) == "true":
+        b = await budget.check_budget(session)
+        if b["allowed"]:
+            try:
+                position = "перевёрнутом" if card.is_reversed else "прямом"
+                result = await gemini.generate(
+                    system_prompt=(
+                        "Ты — доброжелательный таролог. Дай краткое значение карты дня, "
+                        "совет на день и одну рекомендацию-предупреждение. До 700 символов, "
+                        "по-русски, без медицинских и финансовых советов."
+                    ),
+                    user_prompt=f"Карта дня: {card.card.name_ru} в {position} положении.",
+                    max_output_tokens=512,
+                )
+                text = result["text"]
+                session.add(AIRequest(
+                    user_id=db_user.id, model=result["model"],
+                    input_tokens=result["input_tokens"], output_tokens=result["output_tokens"],
+                    cost_usd=budget.estimate_cost(result["model"], result["input_tokens"],
+                                                  result["output_tokens"]),
+                    status="ok", is_free_service=True,
+                ))
+            except gemini.AIError as e:
+                await log_error(session, "daily_card", e, user_id=db_user.id)
+
+    if not text:
+        meaning = (card.card.reversed_meaning if card.is_reversed
+                   else card.card.upright_meaning) or "Прислушайтесь к себе сегодня."
+        text = meaning
+
+    card.text = text
+    await session.commit()
+    await message.answer(f"{header}\n\n{text}")

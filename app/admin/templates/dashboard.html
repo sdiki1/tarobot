@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Панель управления</h2>
+<div class="stats">
+  <div class="stat"><b>{{ stats.users_total }}</b>Пользователей</div>
+  <div class="stat"><b>{{ stats.users_week }}</b>Новых за 7 дней</div>
+  <div class="stat"><b>{{ stats.orders_total }}</b>Заказов</div>
+  <div class="stat"><b>{{ stats.payments_ok }}</b>Успешных оплат</div>
+  <div class="stat"><b>{{ stats.refunds }}</b>Возвратов</div>
+  <div class="stat"><b>{{ stats.stars_sum }} ⭐</b>Сумма оплат</div>
+  <div class="stat"><b>{{ stats.jobs_active }}</b>Активных заданий</div>
+  <div class="stat"><b>{{ stats.jobs_failed }}</b>Ошибочных заданий</div>
+  <div class="stat"><b>${{ "%.2f"|format(stats.ai_cost_month) }}</b>Расходы ИИ (месяц)</div>
+</div>
+<div class="card" style="margin-top:16px">
+  <h3>Экспорт</h3>
+  {% for e in ["users","orders","payments","refunds","ai_costs","promo_activations"] %}
+    <a href="/export/{{e}}.csv">{{e}}.csv</a> · <a href="/export/{{e}}.xlsx">{{e}}.xlsx</a><br>
+  {% endfor %}
+  <p>Фильтр по периоду: добавьте <code>?date_from=2026-01-01&date_to=2026-02-01</code></p>
+</div>
+{% endblock %}

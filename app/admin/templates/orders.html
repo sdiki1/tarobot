@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Заказы</h2>
+<form method="get" class="inline">
+  <select name="status" onchange="this.form.submit()" style="width:auto">
+    <option value="">Все статусы</option>
+    {% for st in ["created","invoiced","paid","completed","failed","refunded","cancelled"] %}
+      <option value="{{ st }}" {{ "selected" if status==st }}>{{ st }}</option>
+    {% endfor %}
+  </select>
+</form>
+<table>
+<tr><th>№</th><th>Пользователь</th><th>Услуга</th><th>Статус</th><th>Сумма ⭐</th><th>Создан</th></tr>
+{% for o in orders %}
+<tr>
+  <td><a href="/orders/{{ o.id }}">{{ o.id }}</a></td>
+  <td>{{ o.user_id }}</td>
+  <td>{{ o.service.title }}</td>
+  <td>{{ o.status.value }}</td>
+  <td>{{ o.final_price_stars }}</td>
+  <td>{{ o.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

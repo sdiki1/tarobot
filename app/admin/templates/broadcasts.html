@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Рассылки</h2>
+<div class="card">
+<form method="post" action="/broadcasts">
+  <label>Текст <textarea name="text" rows="4" required></textarea></label>
+  <label>Аудитория
+    <select name="audience">
+      {% for k, v in audiences.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+    </select></label>
+  <label>Кнопка: текст <input name="button_text"></label>
+  <label>Кнопка: ссылка <input name="button_url"></label>
+  <label><input type="checkbox" name="test_only" value="true" style="width:auto"> Только тест администратору</label>
+  <button onclick="return confirm('Запустить рассылку?')">Запустить</button>
+</form>
+</div>
+<table>
+<tr><th>ID</th><th>Текст</th><th>Статус</th><th>Всего</th><th>Отправлено</th><th>Блок</th><th>Ошибки</th><th>Пропущено</th></tr>
+{% for b in items %}
+<tr>
+  <td>{{ b.id }}</td><td>{{ b.text[:60] }}…</td><td>{{ b.status }}</td>
+  <td>{{ b.total }}</td><td>{{ b.sent }}</td><td>{{ b.blocked }}</td>
+  <td>{{ b.failed }}</td><td>{{ b.unsubscribed_skipped }}</td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

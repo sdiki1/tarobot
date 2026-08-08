@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Заказ №{{ o.id }}</h2>
+<div class="card">
+  <p><b>Пользователь:</b> {{ o.user_id }} · <b>Услуга:</b> {{ o.service.title }} ·
+     <b>Статус:</b> {{ o.status.value }} · <b>Сумма:</b> {{ o.final_price_stars }} ⭐</p>
+  <p><b>Модель:</b> {{ o.model_used or "—" }} · <b>Версия промпта:</b> {{ o.prompt_version_id or "—" }} ·
+     <b>Попыток генерации:</b> {{ job.attempts if job else "—" }} ({{ job.status.value if job else "нет задания" }})</p>
+  <p><b>Входные данные:</b></p><pre>{{ input_json }}</pre>
+  {% if payment %}
+  <p><b>Платёж:</b> {{ payment.amount_stars }} {{ payment.currency }},
+     charge_id: <code>{{ payment.telegram_payment_charge_id }}</code>,
+     статус: {{ payment.status }}, {{ payment.created_at.strftime("%d.%m.%Y %H:%M") }}
+     {% if payment.refunded_at %}· возврат {{ payment.refunded_at.strftime("%d.%m.%Y") }}: {{ payment.refund_reason }}{% endif %}</p>
+  {% endif %}
+  {% if job and job.last_error %}<p><b>Последняя ошибка:</b> {{ job.last_error }}</p>{% endif %}
+</div>
+
+<div class="card">
+  <form class="inline" method="post" action="/orders/{{ o.id }}/retry"><button>🔁 Повторить генерацию</button></form>
+  <form class="inline" method="post" action="/orders/{{ o.id }}/resend"><button>📤 Отправить результат ещё раз</button></form>
+  <form class="inline" method="post" action="/orders/{{ o.id }}/cancel"><button class="danger">Отменить задание</button></form>
+  {% if payment and payment.status == "paid" %}
+  <form class="inline" method="post" action="/orders/{{ o.id }}/refund"
+        onsubmit="return confirm('Выполнить возврат {{ payment.amount_stars }} ⭐?')">
+    <input name="reason" placeholder="Причина возврата" style="width:220px;display:inline-block">
+    <button class="danger">💫 Возврат Stars</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <form method="post" action="/orders/{{ o.id }}/comment">
+    <label>Внутренний комментарий
+      <textarea name="comment" rows="2">{{ o.admin_comment or "" }}</textarea></label>
+    <button>Сохранить комментарий</button>
+  </form>
+</div>
+
+{% if result %}<div class="card"><h3>Результат</h3><pre style="white-space:pre-wrap">{{ result.text }}</pre></div>{% endif %}
+{% if errors %}
+<div class="card"><h3>Ошибки по заказу</h3>
+<table><tr><th>Когда</th><th>Тип</th><th>Сообщение</th></tr>
+{% for e in errors %}<tr><td>{{ e.created_at.strftime("%d.%m %H:%M") }}</td><td>{{ e.error_type }}</td><td>{{ e.message }}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+{% endblock %}

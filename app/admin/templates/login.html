@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:360px;margin:60px auto">
+  <h2>Вход</h2>
+  {% if error %}<p style="color:#a03030">{{ error }}</p>{% endif %}
+  <form method="post" action="/login">
+    <label>Логин <input name="login" required></label>
+    <label>Пароль <input name="password" type="password" required></label>
+    <button type="submit">Войти</button>
+  </form>
+</div>
+{% endblock %}

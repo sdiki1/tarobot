@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taro Bot Admin</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;background:#f5f5f7;color:#222}
+  nav{background:#2d2350;padding:10px 16px}
+  nav a{color:#fff;margin-right:14px;text-decoration:none;font-size:14px}
+  main{max-width:1100px;margin:20px auto;padding:0 16px}
+  table{border-collapse:collapse;width:100%;background:#fff;font-size:14px}
+  th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;vertical-align:top}
+  th{background:#eee}
+  .card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;margin-bottom:16px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+  .stat{background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px}
+  .stat b{font-size:22px;display:block}
+  input,textarea,select{width:100%;box-sizing:border-box;padding:6px;margin:4px 0 10px;
+    border:1px solid #ccc;border-radius:4px;font:inherit}
+  button{background:#2d2350;color:#fff;border:0;border-radius:4px;padding:8px 14px;cursor:pointer}
+  form.inline{display:inline}
+  .danger{background:#a03030}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/">Главная</a>
+  <a href="/services">Услуги</a>
+  <a href="/orders">Заказы</a>
+  <a href="/users">Пользователи</a>
+  <a href="/promos">Промокоды</a>
+  <a href="/broadcasts">Рассылки</a>
+  <a href="/errors">Ошибки</a>
+  <a href="/settings">Тексты и настройки</a>
+  <a href="/logout" style="float:right">Выход</a>
+</nav>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>

@@ -1,0 +1,23 @@
+aiogram==3.15.0
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+SQLAlchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+psycopg2-binary==2.9.10
+redis==5.2.1
+arq==0.26.3
+pydantic==2.10.4
+pydantic-settings==2.7.0
+jinja2==3.1.5
+python-multipart==0.0.20
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+itsdangerous==2.2.0
+google-genai==1.2.0
+httpx==0.28.1
+openpyxl==3.1.5
+timezonefinder==6.5.7
+tzdata==2025.1
+# Swiss Ephemeris: устанавливается только при наличии лицензии (AGPL или Professional).
+# pyswisseph==2.10.3.2

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Тексты и настройки</h2>
+<form method="post" action="/settings" class="card">
+  {% for key, value in values.items() %}
+    <label>{{ key }}
+      {% if value|length > 60 %}
+        <textarea name="{{ key }}" rows="3">{{ value }}</textarea>
+      {% else %}
+        <input name="{{ key }}" value="{{ value }}">
+      {% endif %}
+    </label>
+  {% endfor %}
+  <button type="submit">Сохранить</button>
+</form>
+{% endblock %}

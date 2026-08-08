@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Услуги</h2>
+<p><a href="/services/0"><button>+ Новая услуга</button></a></p>
+<table>
+<tr><th>ID</th><th>Название</th><th>Тип</th><th>Цена ⭐</th><th>Карт</th><th>Активна</th><th>Порядок</th><th></th></tr>
+{% for s in services %}
+<tr>
+  <td>{{ s.id }}</td>
+  <td><a href="/services/{{ s.id }}">{{ s.title }}</a></td>
+  <td>{{ s.type.value }}</td>
+  <td>{{ s.price_stars }}</td>
+  <td>{{ s.cards_count }}</td>
+  <td>{{ "✅" if s.is_active else "—" }}</td>
+  <td>{{ s.sort_order }}</td>
+  <td><form class="inline" method="post" action="/services/{{ s.id }}/archive"
+        onsubmit="return confirm('Архивировать услугу?')">
+      <button class="danger">Архив</button></form></td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

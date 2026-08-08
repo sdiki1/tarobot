@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ "Услуга: " ~ s.title if s else "Новая услуга" }}</h2>
+<form method="post" action="/services/{{ s.id if s else 0 }}" class="card">
+  <label>Код (латиницей) <input name="code" value="{{ s.code if s else '' }}" required></label>
+  <label>Тип
+    <select name="type">
+      <option value="tarot" {{ "selected" if s and s.type.value=="tarot" }}>Таро</option>
+      <option value="natal" {{ "selected" if s and s.type.value=="natal" }}>Натальная карта</option>
+    </select></label>
+  <label>Название <input name="title" value="{{ s.title if s else '' }}" required></label>
+  <label>Описание <textarea name="description" rows="3">{{ s.description if s else '' }}</textarea></label>
+  <label>Цена (Stars) <input type="number" name="price_stars" value="{{ s.price_stars if s else 50 }}" min="1" required></label>
+  <label>Количество карт <input type="number" name="cards_count" value="{{ s.cards_count if s else 1 }}" min="1" max="10"></label>
+  <label>Позиции расклада (через запятую)
+    <input name="positions" value="{{ s.positions|join(', ') if s else '' }}"></label>
+  <label><input type="checkbox" name="requires_question" value="true"
+    {{ "checked" if not s or s.requires_question }} style="width:auto"> Требуется вопрос пользователя</label>
+  <label>Обязательные поля (question, name, birth_date, partner_name, situation, comment)
+    <input name="required_fields" value="{{ s.required_fields|join(', ') if s else '' }}"></label>
+  <label><input type="checkbox" name="allow_reversed" value="true"
+    {{ "checked" if not s or s.allow_reversed }} style="width:auto"> Перевёрнутые карты</label>
+  <label>Максимум символов ответа <input type="number" name="max_output_chars" value="{{ s.max_output_chars if s else 4000 }}"></label>
+  <label>Лимит заказов на пользователя в сутки <input type="number" name="per_user_daily_limit" value="{{ s.per_user_daily_limit if s else 10 }}"></label>
+  <label><input type="checkbox" name="is_active" value="true"
+    {{ "checked" if not s or s.is_active }} style="width:auto"> Услуга активна</label>
+  <label>Порядок отображения <input type="number" name="sort_order" value="{{ s.sort_order if s else 100 }}"></label>
+  <h3>Промпт ИИ {% if p %}(версия {{ p.version }}){% endif %}</h3>
+  <label>Системная инструкция <textarea name="system_prompt" rows="5">{{ p.system_prompt if p else '' }}</textarea></label>
+  <label>Шаблон запроса ({facts}, {question}) <textarea name="user_prompt_template" rows="5">{{ p.user_prompt_template if p else '' }}</textarea></label>
+  <label>Запрещённые темы <textarea name="forbidden_topics" rows="2">{{ p.forbidden_topics if p else '' }}</textarea></label>
+  <label>Требования к стилю <textarea name="style_requirements" rows="2">{{ p.style_requirements if p else '' }}</textarea></label>
+  <button type="submit">Сохранить</button>
+</form>
+{% endblock %}
