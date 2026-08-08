@@ -12,6 +12,7 @@ from app.admin import export, routes
 from app.admin.auth import (
     current_admin, get_db, make_session_cookie, try_login,
 )
+from app.config import get_settings
 from app.db.models import (
     AIRequest, GenerationJob, JobStatus, Order, OrderStatus, Payment, User,
 )
@@ -43,7 +44,8 @@ async def login_post(request: Request, login: str = Form(), password: str = Form
             request, "login.html", {"error": "Неверный логин или пароль (или вход заблокирован)."})
     resp = RedirectResponse("/", status_code=302)
     resp.set_cookie("admin_session", make_session_cookie(admin.id),
-                    httponly=True, secure=True, samesite="lax")
+                    httponly=True, secure=get_settings().admin_cookie_secure,
+                    samesite="lax")
     return resp
 
 

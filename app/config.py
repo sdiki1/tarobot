@@ -33,6 +33,7 @@ class Settings(BaseSettings):
 
     admin_secret_key: str = "change-me"
     admin_session_ttl_minutes: int = 60
+    admin_cookie_secure: bool = False
     admin_panel_host: str = "0.0.0.0"
     admin_panel_port: int = 8000
 

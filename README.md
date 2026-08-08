@@ -25,8 +25,8 @@ docker compose up -d --build
 docker compose run --rm bot python -m scripts.create_admin admin 'ПАРОЛЬ' 111111111
 ```
 
-Админ-панель: `https://<домен>/` (Nginx проксирует на контейнер `admin`,
-сертификаты — в `nginx/certs/`).
+Админ-панель напрямую: `http://<IP-сервера>:8000/`. Также доступен вариант через
+Nginx по `https://<домен>/` при настроенных сертификатах в `nginx/certs/`.
 
 ## Документация
 
