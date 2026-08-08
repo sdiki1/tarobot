@@ -37,7 +37,6 @@ class Settings(BaseSettings):
     admin_panel_port: int = 8000
 
     geocoder_url: str = "https://nominatim.openstreetmap.org/search"
-    geocoder_user_agent: str = "tarobot/1.0"
 
     timezone_display: str = "Europe/Moscow"
     environment: str = "production"
