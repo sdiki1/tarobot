@@ -50,10 +50,12 @@ NATAL_SYSTEM_PROMPT = (
 
 async def main() -> None:
     async with SessionMaker() as session:
-        if not await session.scalar(select(TarotCard).limit(1)):
-            for c in build_deck():
-                session.add(TarotCard(**c))
-            print("Загружено 78 карт Таро")
+        existing_card_ids = set((await session.scalars(select(TarotCard.id))).all())
+        missing_cards = [card for card in build_deck() if card["id"] not in existing_card_ids]
+        for card in missing_cards:
+            session.add(TarotCard(**card))
+        if missing_cards:
+            print(f"Загружено карт Таро: {len(missing_cards)}")
 
         for spec in SERVICES:
             if await session.scalar(select(Service).where(Service.code == spec["code"])):

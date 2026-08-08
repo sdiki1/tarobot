@@ -21,7 +21,7 @@
 ```bash
 cp .env.example .env        # заполнить BOT_TOKEN, пароли, GEMINI_API_KEY
 docker compose up -d --build
-docker compose run --rm bot python scripts/seed.py                 # карты + услуги
+# Миграции и первичное заполнение карт/услуг выполняются автоматически.
 docker compose run --rm bot python scripts/create_admin.py admin 'ПАРОЛЬ' 111111111
 ```
 

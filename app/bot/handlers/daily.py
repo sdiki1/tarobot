@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import budget, gemini
 from app.db.models import AIRequest, User
-from app.services.daily import get_or_create_daily_card
+from app.services.daily import DailyDeckUnavailable, get_or_create_daily_card
 from app.services.errors import log_error
 from app.services.texts import get_setting
 
@@ -18,7 +18,16 @@ async def is_daily_button(message: Message, session: AsyncSession) -> bool:
 
 @router.message(is_daily_button)
 async def daily_card(message: Message, session: AsyncSession, db_user: User):
-    card, created = await get_or_create_daily_card(session, db_user.id)
+    try:
+        card, created = await get_or_create_daily_card(session, db_user.id)
+    except DailyDeckUnavailable as exc:
+        await log_error(session, "daily_card", exc, user_id=db_user.id)
+        await session.commit()
+        await message.answer(
+            "Колода карт временно недоступна. Пожалуйста, попробуйте ещё раз позже."
+        )
+        return
+
     header = (f"🃏 Карта дня: <b>{card.card.name_ru}</b>"
               f"{' (перевёрнутая)' if card.is_reversed else ''}")
 

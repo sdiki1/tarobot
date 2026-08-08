@@ -20,8 +20,7 @@ mkdir -p nginx/certs
 cp /etc/letsencrypt/live/admin.example.com/fullchain.pem nginx/certs/
 cp /etc/letsencrypt/live/admin.example.com/privkey.pem  nginx/certs/
 
-docker compose up -d --build   # миграции применяются сервисом migrate
-docker compose run --rm bot python scripts/seed.py
+docker compose up -d --build   # миграции и seed выполняются автоматически
 docker compose run --rm bot python scripts/create_admin.py admin 'ПАРОЛЬ' <ваш_tg_id>
 ```
 
