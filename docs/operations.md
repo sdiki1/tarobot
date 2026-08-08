@@ -45,6 +45,6 @@ AI_MODEL_FALLBACK=gemini-2.5-flash
 
 ## Права администратора панели
 
-Создание/смена пароля: `docker compose run --rm bot python scripts/create_admin.py <login> <pass> [tg_id]`.
+Создание/смена пароля: `docker compose run --rm bot python -m scripts.create_admin <login> <pass> [tg_id]`.
 Вход блокируется на 15 минут после 5 неверных паролей; входы пишутся в
 журнал действий (`admin_audit_log`).

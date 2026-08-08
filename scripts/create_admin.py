@@ -1,6 +1,6 @@
 """Создание/смена пароля администратора панели.
 
-Запуск: docker compose run --rm bot python scripts/create_admin.py <login> <password> [telegram_id]
+Запуск: docker compose run --rm bot python -m scripts.create_admin <login> <password> [telegram_id]
 """
 import asyncio
 import sys

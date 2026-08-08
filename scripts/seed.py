@@ -1,6 +1,6 @@
 """Первичное заполнение БД: 78 карт Таро, стартовые услуги с промптами.
 
-Запуск: docker compose run --rm bot python scripts/seed.py
+Запуск: docker compose run --rm bot python -m scripts.seed
 """
 import asyncio
 

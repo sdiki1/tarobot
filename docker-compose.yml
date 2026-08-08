@@ -34,7 +34,7 @@ services:
 
   seed:
     build: .
-    command: python scripts/seed.py
+    command: python -m scripts.seed
     env_file: .env
     depends_on:
       migrate:

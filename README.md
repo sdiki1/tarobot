@@ -22,7 +22,7 @@
 cp .env.example .env        # заполнить BOT_TOKEN, пароли, GEMINI_API_KEY
 docker compose up -d --build
 # Миграции и первичное заполнение карт/услуг выполняются автоматически.
-docker compose run --rm bot python scripts/create_admin.py admin 'ПАРОЛЬ' 111111111
+docker compose run --rm bot python -m scripts.create_admin admin 'ПАРОЛЬ' 111111111
 ```
 
 Админ-панель: `https://<домен>/` (Nginx проксирует на контейнер `admin`,
