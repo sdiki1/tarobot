@@ -1,6 +1,6 @@
 # Taro Bot — Telegram-бот раскладов Таро и натальных карт
 
-Телеграм-бот с оплатой в Telegram Stars, интерпретациями через Gemini API,
+Телеграм-бот с оплатой в Telegram Stars, интерпретациями через OpenAI API,
 расчётом натальных карт (Swiss Ephemeris) и веб-админкой.
 
 ## Состав
@@ -13,13 +13,13 @@
 | БД | PostgreSQL 16 + SQLAlchemy 2 + Alembic | `app/db/`, `alembic/` |
 | Модуль Таро | серверный ГСЧ (`secrets`) | `app/tarot/` |
 | Натальная карта | Swiss Ephemeris + IANA tzdata | `app/natal/` |
-| ИИ | Google Gemini API (модель в настройках) | `app/ai/` |
+| ИИ | OpenAI Responses API (модель в настройках) | `app/ai/` |
 | Бэкапы | pg_dump ежедневно, контейнер `backup` | `scripts/` |
 
 ## Быстрый старт
 
 ```bash
-cp .env.example .env        # заполнить BOT_TOKEN, пароли, GEMINI_API_KEY
+cp .env.example .env        # заполнить BOT_TOKEN, пароли, OPENAI_API_KEY
 docker compose up -d --build
 # Миграции и первичное заполнение карт/услуг выполняются автоматически.
 docker compose run --rm bot python -m scripts.create_admin admin 'ПАРОЛЬ' 111111111
@@ -41,7 +41,7 @@ Nginx по `https://<домен>/` при настроенных сертифи�
   Для коммерческого закрытого проекта требуется Swiss Ephemeris Professional
   License (приобретается Заказчиком). Без установленной библиотеки заказы
   натальной карты завершатся ошибкой генерации — услугу можно отключить в админке.
-- **Gemini API**: ключ и платёжный профиль принадлежат Заказчику; расходы
+- **OpenAI API**: ключ и платёжный профиль принадлежат Заказчику; расходы
   оплачиваются отдельно. Модель задаётся в `.env` (`AI_MODEL_PRIMARY`).
 - **Telegram Stars**: цифровые услуги внутри Telegram оплачиваются только в XTR;
   возвраты — через `refundStarPayment` из карточки заказа в админке.

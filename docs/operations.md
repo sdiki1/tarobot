@@ -5,18 +5,18 @@
 Название модели не зашито в код — правится в `.env`:
 
 ```
-AI_MODEL_PRIMARY=gemini-3.5-flash
-AI_MODEL_FALLBACK=gemini-2.5-flash
+AI_MODEL_PRIMARY=gpt-5.6-luna
+AI_MODEL_FALLBACK=gpt-5.4-nano
 ```
 
 Затем `docker compose up -d bot worker`. Перед сменой сверьте актуальность
-модели с официальным графиком поддержки Google (preview-модели в production
-не используются). Цены на токены для учёта расходов — в `app/ai/budget.py`
+модели с официальной документацией OpenAI. Цены на токены для учёта расходов —
+в `app/ai/budget.py`
 (`PRICES`).
 
 ## Смена API-ключей
 
-- `BOT_TOKEN`, `GEMINI_API_KEY`, `POSTGRES_PASSWORD` — в `.env`, затем
+- `BOT_TOKEN`, `OPENAI_API_KEY`, `POSTGRES_PASSWORD` — в `.env`, затем
   `docker compose up -d`. Реальные ключи в Git не попадают (`.gitignore`).
 
 ## Лимиты расходов ИИ
@@ -40,7 +40,7 @@ AI_MODEL_FALLBACK=gemini-2.5-flash
 
 Проект не содержит привязок к разработчику: стандартные Python/Docker/Alembic.
 Передаются: репозиторий с историей, `.env` (заполненный Заказчиком),
-доступы к серверу/домену/БД/Gemini, учётка админ-панели
+доступы к серверу/домену/БД/OpenAI, учётка админ-панели
 (`scripts/create_admin.py`). Смена всех ключей после передачи обязательна.
 
 ## Права администратора панели

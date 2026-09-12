@@ -2,7 +2,7 @@
 
 ## Требования к серверу
 
-VPS за пределами РФ (доступность Gemini API), 1–2 CPU, 2 ГБ RAM, 20 ГБ диск,
+VPS с доступом к OpenAI API, 1–2 CPU, 2 ГБ RAM, 20 ГБ диск,
 Ubuntu 22.04+, Docker + Docker Compose plugin, домен для админ-панели.
 
 ## Развёртывание на новом сервере
@@ -10,7 +10,7 @@ Ubuntu 22.04+, Docker + Docker Compose plugin, домен для админ-па
 ```bash
 git clone <репозиторий> tarobot && cd tarobot
 cp .env.example .env
-nano .env                      # BOT_TOKEN, POSTGRES_PASSWORD, GEMINI_API_KEY,
+nano .env                      # BOT_TOKEN, POSTGRES_PASSWORD, OPENAI_API_KEY,
                                # ADMIN_SECRET_KEY (openssl rand -hex 32), ADMIN_TG_IDS
 
 # HTTPS-сертификат (пример с certbot standalone):

@@ -9,6 +9,8 @@ from app.db.models import AIRequest
 
 # Ориентировочные цены за 1M токенов (USD); уточняются в настройках при смене модели.
 PRICES = {
+    "gpt-5.6-luna": {"input": 0.20, "output": 1.20},
+    "gpt-5.4-nano": {"input": 0.20, "output": 1.25},
     "default": {"input": 0.30, "output": 2.50},
 }
 

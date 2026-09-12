@@ -1,6 +1,6 @@
 """Очередь фоновых заданий (arq + Redis).
 
-generate_result: выбор карт / расчёт натальной карты -> промпт -> Gemini -> результат.
+generate_result: выбор карт / расчёт натальной карты -> промпт -> OpenAI -> результат.
 Повторные попытки с увеличивающейся задержкой; после исчерпания — уведомление админа.
 """
 import asyncio
@@ -15,7 +15,7 @@ from arq.connections import RedisSettings
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai import budget, gemini
+from app.ai import budget, openai_client
 from app.bot.notify import notify_admins
 from app.config import get_settings
 from app.db.models import (
@@ -152,14 +152,14 @@ async def generate_result(ctx: dict, order_id: int) -> None:
             if b["warn"]:
                 await notify_admins(bot, b["warn"])
             if not b["allowed"]:
-                raise gemini.AIError("AI budget exceeded")
+                raise openai_client.AIError("AI budget exceeded")
             model = settings.ai_model_fallback if b["use_fallback"] else None
 
             # --- генерация ---
             try:
-                ai = await gemini.generate(system_prompt, user_prompt, model=model)
+                ai = await openai_client.generate(system_prompt, user_prompt, model=model)
                 status = "ok"
-            except gemini.AIError:
+            except openai_client.AIError:
                 session.add(AIRequest(order_id=order.id, user_id=order.user_id,
                                       model=model or settings.ai_model_primary,
                                       status="error"))

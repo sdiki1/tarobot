@@ -3,7 +3,7 @@ from aiogram import Router
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai import budget, gemini
+from app.ai import budget, openai_client
 from app.db.models import AIRequest, User
 from app.services.daily import DailyDeckUnavailable, get_or_create_daily_card
 from app.services.errors import log_error
@@ -41,7 +41,7 @@ async def daily_card(message: Message, session: AsyncSession, db_user: User):
         if b["allowed"]:
             try:
                 position = "перевёрнутом" if card.is_reversed else "прямом"
-                result = await gemini.generate(
+                result = await openai_client.generate(
                     system_prompt=(
                         "Ты — доброжелательный таролог. Дай краткое значение карты дня, "
                         "совет на день и одну рекомендацию-предупреждение. До 700 символов, "
@@ -58,7 +58,7 @@ async def daily_card(message: Message, session: AsyncSession, db_user: User):
                                                   result["output_tokens"]),
                     status="ok", is_free_service=True,
                 ))
-            except gemini.AIError as e:
+            except openai_client.AIError as e:
                 await log_error(session, "daily_card", e, user_id=db_user.id)
 
     if not text:

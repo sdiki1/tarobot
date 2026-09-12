@@ -18,10 +18,10 @@ class Settings(BaseSettings):
     redis_host: str = "redis"
     redis_port: int = 6379
 
-    ai_provider: str = "gemini"
-    gemini_api_key: str = ""
-    ai_model_primary: str = "gemini-3.5-flash"
-    ai_model_fallback: str = "gemini-2.5-flash"
+    ai_provider: str = "openai"
+    openai_api_key: str = ""
+    ai_model_primary: str = "gpt-5.6-luna"
+    ai_model_fallback: str = "gpt-5.4-nano"
     ai_max_input_tokens: int = 8000
     ai_max_output_tokens: int = 2048
     ai_temperature: float = 0.8
