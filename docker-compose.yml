@@ -58,7 +58,7 @@ services:
   worker:
     build: .
     restart: unless-stopped
-    command: arq app.worker.worker.WorkerSettings
+    command: python -m app.worker.main
     env_file: .env
     depends_on:
       seed:
