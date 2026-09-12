@@ -14,6 +14,7 @@ from arq.connections import RedisSettings
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import lazyload
 
 from app.config import get_settings
 from app.db.models import GenerationJob, Order, OrderStatus, Payment, User
@@ -21,6 +22,16 @@ from app.services.errors import log_error
 from app.services.texts import get_setting
 
 router = Router()
+
+
+async def _get_order_for_update(session: AsyncSession, order_id: int) -> Order | None:
+    """Загружает и блокирует только orders, без eager JOIN к services."""
+    return await session.scalar(
+        select(Order)
+        .where(Order.id == order_id)
+        .options(lazyload(Order.service))
+        .with_for_update()
+    )
 
 
 async def _enqueue_generation(session: AsyncSession, order: Order, user_id: int) -> None:
@@ -60,9 +71,7 @@ async def successful_payment(message: Message, session: AsyncSession,
     order_id = int(sp.invoice_payload.split(":")[1])
 
     # Одна транзакция: платёж (уникальный charge_id) + статус заказа + задание (уникальный order_id)
-    # Order.service загружается через LEFT JOIN; блокируем только строку orders,
-    # иначе PostgreSQL отклоняет FOR UPDATE на nullable-стороне join.
-    order = await session.get(Order, order_id, with_for_update={"of": Order})
+    order = await _get_order_for_update(session, order_id)
     if order is None:
         await log_error(session, "payments", message=f"Оплата несуществующего заказа {order_id}",
                         user_id=db_user.id)
@@ -103,7 +112,7 @@ async def test_payment(callback: CallbackQuery, session: AsyncSession, db_user: 
         await callback.answer("Некорректный заказ.", show_alert=True)
         return
 
-    order = await session.get(Order, order_id, with_for_update={"of": Order})
+    order = await _get_order_for_update(session, order_id)
     if (
         order is None
         or order.user_id != db_user.id
