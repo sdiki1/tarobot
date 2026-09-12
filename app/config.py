@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     ai_monthly_budget_usd: float = 100.0
     ai_budget_action: str = "block"  # block | fallback
 
+    test_payment_enabled: bool = False
+
     admin_secret_key: str = "change-me"
     admin_session_ttl_minutes: int = 60
     admin_cookie_secure: bool = False

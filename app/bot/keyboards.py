@@ -31,8 +31,14 @@ def consent_kb() -> InlineKeyboardMarkup:
     ]])
 
 
-def promo_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
+def promo_kb(order_id: int | None = None, test_payment: bool = False) -> InlineKeyboardMarkup:
+    buttons = [
         [InlineKeyboardButton(text="🎟 Ввести промокод", callback_data="promo:enter")],
         [InlineKeyboardButton(text="💳 Перейти к оплате", callback_data="promo:skip")],
-    ])
+    ]
+    if test_payment and order_id is not None:
+        buttons.append([InlineKeyboardButton(
+            text="🧪 Тестовая оплата",
+            callback_data=f"testpay:{order_id}",
+        )])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)

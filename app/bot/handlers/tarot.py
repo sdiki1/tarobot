@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import promo_kb
 from app.bot.states import TarotOrder
+from app.config import get_settings
 from app.db.models import Order, OrderStatus, Service, ServiceType, User
 from app.services.promo import validate_promo
 from app.services.texts import get_setting
@@ -106,7 +107,10 @@ async def _ask_next_field(message: Message, state: FSMContext,
     await state.update_data(order_id=order.id)
     await message.answer(
         f"Заказ №{order.id} создан. Сумма: {order.final_price_stars} ⭐",
-        reply_markup=promo_kb(),
+        reply_markup=promo_kb(
+            order.id,
+            get_settings().test_payment_enabled and db_user.id in get_settings().admin_ids,
+        ),
     )
 
 
@@ -137,7 +141,13 @@ async def promo_apply(message: Message, state: FSMContext,
     )
     await state.set_state(None)
     if err:
-        await message.answer(f"❌ {err}", reply_markup=promo_kb())
+        await message.answer(
+            f"❌ {err}",
+            reply_markup=promo_kb(
+                order.id,
+                get_settings().test_payment_enabled and db_user.id in get_settings().admin_ids,
+            ),
+        )
         return
     order.promo_code_id = promo.id
     order.final_price_stars = final

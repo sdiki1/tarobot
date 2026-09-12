@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.bot.handlers.tarot import send_invoice
 from app.bot.keyboards import promo_kb
 from app.bot.states import NatalOrder
+from app.config import get_settings
 from app.db.models import BirthProfile, Order, Service, ServiceType, User
 from app.natal.geocode import geocode
 from app.services.errors import log_error
@@ -173,5 +174,8 @@ async def _finish_place(message: Message, state: FSMContext, session: AsyncSessi
     await state.update_data(order_id=order.id, variants=None)
     await message.answer(
         f"Заказ №{order.id} создан. Сумма: {order.final_price_stars} ⭐",
-        reply_markup=promo_kb(),
+        reply_markup=promo_kb(
+            order.id,
+            get_settings().test_payment_enabled and db_user.id in get_settings().admin_ids,
+        ),
     )
