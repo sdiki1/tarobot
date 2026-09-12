@@ -141,11 +141,20 @@ async def generate_result(ctx: dict, order_id: int) -> None:
                     system_prompt += f"\nСтиль: {prompt_row.style_requirements}"
                 order.prompt_version_id = prompt_row.id
 
-            user_prompt = template.format(
+            template_values = {
+                key: value
+                for key, value in order.input_data.items()
+                if isinstance(value, str) and key not in {"facts", "question"}
+            }
+            template_values.update(
                 facts=facts,
                 question=order.input_data.get("question", "—"),
-                **{k: v for k, v in order.input_data.items() if isinstance(v, str)},
-            ) if "{" in template else f"{template}\n\n{facts}"
+            )
+            user_prompt = (
+                template.format(**template_values)
+                if "{" in template
+                else f"{template}\n\n{facts}"
+            )
 
             # --- бюджет ---
             b = await budget.check_budget(session)
