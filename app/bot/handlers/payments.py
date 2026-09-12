@@ -60,7 +60,9 @@ async def successful_payment(message: Message, session: AsyncSession,
     order_id = int(sp.invoice_payload.split(":")[1])
 
     # Одна транзакция: платёж (уникальный charge_id) + статус заказа + задание (уникальный order_id)
-    order = await session.get(Order, order_id, with_for_update=True)
+    # Order.service загружается через LEFT JOIN; блокируем только строку orders,
+    # иначе PostgreSQL отклоняет FOR UPDATE на nullable-стороне join.
+    order = await session.get(Order, order_id, with_for_update={"of": Order})
     if order is None:
         await log_error(session, "payments", message=f"Оплата несуществующего заказа {order_id}",
                         user_id=db_user.id)
@@ -101,7 +103,7 @@ async def test_payment(callback: CallbackQuery, session: AsyncSession, db_user: 
         await callback.answer("Некорректный заказ.", show_alert=True)
         return
 
-    order = await session.get(Order, order_id, with_for_update=True)
+    order = await session.get(Order, order_id, with_for_update={"of": Order})
     if (
         order is None
         or order.user_id != db_user.id
