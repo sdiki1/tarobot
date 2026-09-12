@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     ai_model_fallback: str = "gpt-5.4-nano"
     ai_max_input_tokens: int = 8000
     ai_max_output_tokens: int = 2048
-    ai_temperature: float = 0.8
     ai_timeout_seconds: int = 60
     ai_max_retries: int = 3
     ai_daily_budget_usd: float = 5.0

@@ -30,7 +30,7 @@ async def generate(
                 instructions=system_prompt,
                 input=user_prompt,
                 max_output_tokens=max_output_tokens or settings.ai_max_output_tokens,
-                temperature=settings.ai_temperature,
+                reasoning={"effort": "none"},
                 store=False,
             ),
             timeout=settings.ai_timeout_seconds,
