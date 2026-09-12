@@ -7,6 +7,7 @@ from app.ai import budget, openai_client
 from app.db.models import AIRequest, User
 from app.services.daily import DailyDeckUnavailable, get_or_create_daily_card
 from app.services.errors import log_error
+from app.services.formatting import markdown_to_telegram_html
 from app.services.texts import get_setting
 
 router = Router()
@@ -50,7 +51,7 @@ async def daily_card(message: Message, session: AsyncSession, db_user: User):
                     user_prompt=f"Карта дня: {card.card.name_ru} в {position} положении.",
                     max_output_tokens=512,
                 )
-                text = result["text"]
+                text = markdown_to_telegram_html(result["text"])
                 session.add(AIRequest(
                     user_id=db_user.id, model=result["model"],
                     input_tokens=result["input_tokens"], output_tokens=result["output_tokens"],

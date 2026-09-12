@@ -25,6 +25,7 @@ from app.db.models import (
 from app.db.session import SessionMaker
 from app.natal.calc import calculate_natal
 from app.services.errors import log_error
+from app.services.formatting import markdown_to_telegram_html
 from app.services.texts import get_setting
 from app.tarot.draw import draw_cards
 
@@ -184,7 +185,9 @@ async def generate_result(ctx: dict, order_id: int) -> None:
             ))
 
             disclaimer = await get_setting(session, "service_disclaimer")
-            text = ai["text"][:order.service.max_output_chars]
+            text = markdown_to_telegram_html(
+                ai["text"][:order.service.max_output_chars]
+            )
             full_text = f"<b>{order.service.title}</b>\n\n{facts}\n\n{text}\n\n{disclaimer}"
 
             session.add(Result(order_id=order.id, user_id=order.user_id, text=full_text))
