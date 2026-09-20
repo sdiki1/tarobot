@@ -12,11 +12,14 @@ from app.bot.keyboards import promo_kb
 from app.bot.states import NatalOrder
 from app.config import get_settings
 from app.db.models import BirthProfile, Order, Service, ServiceType, User
+from app.natal.calc import HAS_SWE
 from app.natal.geocode import geocode
 from app.services.errors import log_error
 from app.services.texts import get_setting
 
 router = Router()
+
+UNAVAILABLE_TEXT = "Раздел «Натальная карта» временно недоступен. Загляните позже 🙏"
 
 # Маркеры в Service.required_fields для услуг типа natal:
 #   partner  — собрать данные рождения второго человека (совместимость)
@@ -37,6 +40,9 @@ def _active_natal(service: Service | None) -> bool:
 async def natal_menu(message: Message, state: FSMContext, session: AsyncSession):
     """Раздел «Натальная карта»: список услуг кнопками."""
     await state.set_state(None)
+    if not HAS_SWE:  # без модуля расчёта заказ завершится ошибкой — оплату не принимаем
+        await message.answer(UNAVAILABLE_TEXT)
+        return
     services = (await session.scalars(
         select(Service).where(Service.type == ServiceType.natal,
                               Service.is_active.is_(True), Service.is_archived.is_(False))
@@ -76,8 +82,8 @@ async def natal_service_card(cb: CallbackQuery, session: AsyncSession):
 async def natal_start(cb: CallbackQuery, state: FSMContext,
                       session: AsyncSession, db_user: User):
     service = await session.get(Service, int(cb.data.split(":")[1]))
-    if not _active_natal(service):
-        await cb.answer("Услуга недоступна", show_alert=True)
+    if not _active_natal(service) or not HAS_SWE:
+        await cb.answer("Услуга временно недоступна", show_alert=True)
         return
 
     day_ago = datetime.now(timezone.utc) - timedelta(days=1)

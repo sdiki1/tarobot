@@ -19,5 +19,5 @@ httpx==0.28.1
 openpyxl==3.1.5
 timezonefinder==6.5.7
 tzdata==2025.1
-# Swiss Ephemeris: устанавливается только при наличии лицензии (AGPL или Professional).
-# pyswisseph==2.10.3.2
+# Swiss Ephemeris (pyswisseph==2.10.3.2) ставится в Dockerfile по флагу INSTALL_SWISSEPH=true
+# из .env — только при наличии лицензии (AGPL или Professional).

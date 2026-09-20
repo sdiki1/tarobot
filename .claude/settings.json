@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s https://pypi.org/pypi/pyswisseph/json)",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s https://pypi.org/pypi/pyswisseph/2.10.3.2/json)",
+      "Bash(python3 -m compileall -q app)",
+      "Bash(docker compose *)",
+      "Bash(INSTALL_SWISSEPH=true docker compose config)",
+      "Bash(docker build *)",
+      "Bash(docker rmi *)"
+    ]
+  }
+}
