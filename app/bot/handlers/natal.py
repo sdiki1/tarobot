@@ -1,10 +1,10 @@
-"""Натальная карта: сбор данных рождения, геокодинг, выбор точности времени, оплата."""
-from datetime import datetime
+"""Натальная карта: выбор услуги, сбор данных рождения, геокодинг, выбор точности времени, оплата."""
+from datetime import datetime, timedelta, timezone
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.handlers.tarot import send_invoice
@@ -18,32 +18,101 @@ from app.services.texts import get_setting
 
 router = Router()
 
+# Маркеры в Service.required_fields для услуг типа natal:
+#   partner  — собрать данные рождения второго человека (совместимость)
+#   transits — рассчитать транзиты на 12 месяцев вперёд (прогноз); используется воркером
+PARTNER_FIELD = "partner"
+
 
 async def is_natal_button(message: Message, session: AsyncSession) -> bool:
     return message.text == await get_setting(session, "btn_natal")
 
 
+def _active_natal(service: Service | None) -> bool:
+    return bool(service and service.type == ServiceType.natal
+                and service.is_active and not service.is_archived)
+
+
 @router.message(is_natal_button)
-async def natal_start(message: Message, state: FSMContext, session: AsyncSession):
-    service = await session.scalar(
+async def natal_menu(message: Message, state: FSMContext, session: AsyncSession):
+    """Раздел «Натальная карта»: список услуг кнопками."""
+    await state.set_state(None)
+    services = (await session.scalars(
         select(Service).where(Service.type == ServiceType.natal,
                               Service.is_active.is_(True), Service.is_archived.is_(False))
-        .order_by(Service.sort_order)
-    )
-    if not service:
+        .order_by(Service.sort_order, Service.id)
+    )).all()
+    if not services:
         await message.answer("Услуга «Натальная карта» временно недоступна.")
         return
-    await state.set_state(NatalOrder.name)
-    await state.update_data(service_id=service.id)
-    await message.answer(
-        f"✨ <b>{service.title}</b> — {service.price_stars} ⭐\n{service.description}\n\n"
-        "Введите имя или обозначение профиля:"
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=s.title[:64], callback_data=f"natal:{s.id}")]
+        for s in services
+    ])
+    await message.answer(await get_setting(session, "natal_menu_text"), reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("natal:"))
+async def natal_service_card(cb: CallbackQuery, session: AsyncSession):
+    """Краткое описание услуги и кнопка «РАССЧИТАТЬ»."""
+    service = await session.get(Service, int(cb.data.split(":")[1]))
+    if not _active_natal(service):
+        await cb.answer("Услуга недоступна", show_alert=True)
+        return
+    text = (f"<b>{service.title}</b>\n\n{service.description}\n\n"
+            f"Стоимость: {service.price_stars} ⭐")
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+        text=await get_setting(session, "btn_calculate") or "РАССЧИТАТЬ",
+        callback_data=f"natalgo:{service.id}",
+    )]])
+    await cb.answer()
+    if service.image_file_id and len(text) <= 1024:
+        await cb.message.answer_photo(service.image_file_id, caption=text, reply_markup=kb)
+    else:
+        await cb.message.answer(text, reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("natalgo:"))
+async def natal_start(cb: CallbackQuery, state: FSMContext,
+                      session: AsyncSession, db_user: User):
+    service = await session.get(Service, int(cb.data.split(":")[1]))
+    if not _active_natal(service):
+        await cb.answer("Услуга недоступна", show_alert=True)
+        return
+
+    day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+    count = await session.scalar(
+        select(func.count()).select_from(Order).where(
+            Order.user_id == db_user.id, Order.service_id == service.id,
+            Order.created_at >= day_ago,
+        )
     )
+    if service.per_user_daily_limit and count >= service.per_user_daily_limit:
+        await cb.answer("Достигнут дневной лимит по этой услуге. Попробуйте завтра.",
+                        show_alert=True)
+        return
+
+    needs_partner = PARTNER_FIELD in (service.required_fields or [])
+    await state.set_state(NatalOrder.name)
+    await state.update_data(service_id=service.id, needs_partner=needs_partner,
+                            person=0, profile_ids=[], names=[], variants=None)
+    await cb.answer()
+    if needs_partner:
+        await cb.message.answer(
+            "Для расчёта нужны данные рождения двух человек.\n\n"
+            "Сначала ваши данные. Введите ваше имя:"
+        )
+    else:
+        await cb.message.answer("Введите имя или обозначение профиля:")
 
 
 @router.message(NatalOrder.name)
 async def natal_name(message: Message, state: FSMContext):
-    await state.update_data(name=(message.text or "").strip()[:128])
+    name = (message.text or "").strip()[:128]
+    if not name:
+        await message.answer("Введите имя текстом:")
+        return
+    await state.update_data(name=name)
     await state.set_state(NatalOrder.birth_date)
     await message.answer("Введите дату рождения (ДД.ММ.ГГГГ):")
 
@@ -54,6 +123,9 @@ async def natal_birth_date(message: Message, state: FSMContext):
         d = datetime.strptime((message.text or "").strip(), "%d.%m.%Y").date()
     except ValueError:
         await message.answer("Неверный формат. Пример: 21.03.1990")
+        return
+    if d > datetime.now().date() or d.year < 1800:
+        await message.answer("Проверьте дату рождения. Пример: 21.03.1990")
         return
     await state.update_data(birth_date=d.isoformat())
     await state.set_state(NatalOrder.time_accuracy)
@@ -162,16 +234,31 @@ async def _finish_place(message: Message, state: FSMContext, session: AsyncSessi
     session.add(profile)
     await session.flush()
 
+    profile_ids = [*data.get("profile_ids", []), profile.id]
+    names = [*data.get("names", []), data["name"]]
+
+    if data.get("needs_partner") and data.get("person", 0) == 0:
+        # Первый профиль сохранён — собираем данные второго человека
+        await session.commit()
+        await state.update_data(profile_ids=profile_ids, names=names, person=1,
+                                variants=None, birth_time=None)
+        await state.set_state(NatalOrder.name)
+        await message.answer("Отлично! Теперь данные второго человека.\nВведите его имя:")
+        return
+
     service = await session.get(Service, data["service_id"])
+    input_data = {"birth_profile_id": profile_ids[0], "name": names[0]}
+    if len(profile_ids) > 1:
+        input_data.update(partner_birth_profile_id=profile_ids[1], partner_name=names[1])
     order = Order(
         user_id=db_user.id, service_id=service.id,
-        input_data={"birth_profile_id": profile.id, "name": data["name"]},
+        input_data=input_data,
         price_stars=service.price_stars, final_price_stars=service.price_stars,
     )
     session.add(order)
     await session.commit()
     await state.set_state(None)
-    await state.update_data(order_id=order.id, variants=None)
+    await state.update_data(order_id=order.id, variants=None, profile_ids=[], names=[])
     await message.answer(
         f"Заказ №{order.id} создан. Сумма: {order.final_price_stars} ⭐",
         reply_markup=promo_kb(

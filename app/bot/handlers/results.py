@@ -23,14 +23,6 @@ async def is_support_button(message: Message, session: AsyncSession) -> bool:
     return message.text == await get_setting(session, "btn_support")
 
 
-async def is_terms_button(message: Message, session: AsyncSession) -> bool:
-    return message.text == await get_setting(session, "btn_terms")
-
-
-async def is_privacy_button(message: Message, session: AsyncSession) -> bool:
-    return message.text == await get_setting(session, "btn_privacy")
-
-
 @router.message(is_results_button)
 async def my_results(message: Message, session: AsyncSession, db_user: User):
     orders = (await session.scalars(
@@ -72,12 +64,3 @@ async def open_result(cb: CallbackQuery, session: AsyncSession, db_user: User):
 async def support(message: Message, session: AsyncSession):
     await message.answer(await get_setting(session, "support_text"))
 
-
-@router.message(is_terms_button)
-async def terms_btn(message: Message, session: AsyncSession):
-    await message.answer(await get_setting(session, "terms_text"))
-
-
-@router.message(is_privacy_button)
-async def privacy_btn(message: Message, session: AsyncSession):
-    await message.answer(await get_setting(session, "privacy_text"))

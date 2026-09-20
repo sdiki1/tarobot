@@ -49,7 +49,7 @@ class UserConsent(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
-    document: Mapped[str] = mapped_column(String(32))  # terms | privacy
+    document: Mapped[str] = mapped_column(String(32))  # terms | privacy | pd_consent
     version: Mapped[str] = mapped_column(String(16))
     accepted_at: Mapped[datetime] = now_col()
 

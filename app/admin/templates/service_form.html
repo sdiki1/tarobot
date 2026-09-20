@@ -11,12 +11,12 @@
   <label>Название <input name="title" value="{{ s.title if s else '' }}" required></label>
   <label>Описание <textarea name="description" rows="3">{{ s.description if s else '' }}</textarea></label>
   <label>Цена (Stars) <input type="number" name="price_stars" value="{{ s.price_stars if s else 50 }}" min="1" required></label>
-  <label>Количество карт <input type="number" name="cards_count" value="{{ s.cards_count if s else 1 }}" min="1" max="10"></label>
+  <label>Количество карт <input type="number" name="cards_count" value="{{ s.cards_count if s else 1 }}" min="0" max="10"></label>
   <label>Позиции расклада (через запятую)
     <input name="positions" value="{{ s.positions|join(', ') if s else '' }}"></label>
   <label><input type="checkbox" name="requires_question" value="true"
     {{ "checked" if not s or s.requires_question }} style="width:auto"> Требуется вопрос пользователя</label>
-  <label>Обязательные поля (question, name, birth_date, partner_name, situation, comment)
+  <label>Обязательные поля (Таро: question, name, birth_date, partner_name, situation, comment; натальная карта: partner — данные второго человека, transits — транзиты на год)
     <input name="required_fields" value="{{ s.required_fields|join(', ') if s else '' }}"></label>
   <label><input type="checkbox" name="allow_reversed" value="true"
     {{ "checked" if not s or s.allow_reversed }} style="width:auto"> Перевёрнутые карты</label>

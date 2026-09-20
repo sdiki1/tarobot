@@ -167,15 +167,26 @@ async def promo_skip(cb: CallbackQuery, state: FSMContext, session: AsyncSession
     await send_invoice(cb.message, session, order)
 
 
+def invoice_title(title: str, limit: int = 32) -> str:
+    """Заголовок счёта: без ведущих эмодзи, не длиннее 32 символов, обрезка по словам."""
+    title = title.strip()
+    while title and not title[0].isalnum():
+        title = title[1:].lstrip()
+    if len(title) <= limit:
+        return title or "Услуга"
+    cut = title[:limit - 1].rsplit(" ", 1)[0]
+    return cut.rstrip(" ,.;:—-") + "…"
+
+
 async def send_invoice(message: Message, session: AsyncSession, order: Order):
     """Счёт в Telegram Stars (валюта XTR, provider_token пустой)."""
     order.status = OrderStatus.invoiced
     await session.commit()
     await message.answer_invoice(
-        title=order.service.title[:32],
+        title=invoice_title(order.service.title),
         description=(order.service.description or order.service.title)[:255],
         payload=f"order:{order.id}",
         currency="XTR",
-        prices=[LabeledPrice(label=order.service.title[:32],
+        prices=[LabeledPrice(label=invoice_title(order.service.title),
                              amount=order.final_price_stars)],
     )

@@ -126,3 +126,65 @@ def calculate_natal(
     data["aspects"] = aspects
 
     return {"data": data, "warnings": warnings, "utc_offset_used": offset_hours}
+
+
+def _find_aspect(lon_a: float, lon_b: float, orb: float) -> tuple[str, float] | None:
+    diff = abs(lon_a - lon_b) % 360
+    diff = min(diff, 360 - diff)
+    for asp_name, angle in ASPECTS.items():
+        if abs(diff - angle) <= orb:
+            return asp_name, round(abs(diff - angle), 2)
+    return None
+
+
+SYNASTRY_ORB = 5.0
+
+
+def synastry_aspects(planets_a: dict, planets_b: dict) -> list[dict]:
+    """Аспекты между планетами двух карт (a — первый человек, b — второй)."""
+    result = []
+    for name_a, info_a in planets_a.items():
+        for name_b, info_b in planets_b.items():
+            found = _find_aspect(info_a["lon"], info_b["lon"], SYNASTRY_ORB)
+            if found:
+                result.append({"a": name_a, "b": name_b, "aspect": found[0], "orb": found[1]})
+    result.sort(key=lambda x: x["orb"])
+    return result
+
+
+TRANSIT_PLANETS = ["Юпитер", "Сатурн", "Уран", "Нептун", "Плутон"]
+TRANSIT_ORB = 1.5
+
+
+def calculate_transits(natal_planets: dict, start: date, months: int = 12) -> list[dict]:
+    """Транзиты медленных планет к натальным на `months` месяцев вперёд (срез на 1-е и 15-е).
+
+    Возвращает список по месяцам: {"month": "2026-10", "positions": {...}, "aspects": [...]}.
+    """
+    if not HAS_SWE:
+        raise RuntimeError("Swiss Ephemeris (pyswisseph) не установлен.")
+    result = []
+    year, month = start.year, start.month
+    for _ in range(months):
+        positions: dict[str, str] = {}
+        seen: dict[tuple, dict] = {}
+        for day in (1, 15):
+            jd = swe.julday(year, month, day, 12.0)
+            for name in TRANSIT_PLANETS:
+                pos, _flags = swe.calc_ut(jd, PLANETS[name])
+                if day == 1:
+                    positions[name] = _sign(pos[0]) + (" R" if pos[3] < 0 else "")
+                for natal_name, info in natal_planets.items():
+                    found = _find_aspect(pos[0], info["lon"], TRANSIT_ORB)
+                    if not found:
+                        continue
+                    key = (name, natal_name, found[0])
+                    if key not in seen or found[1] < seen[key]["orb"]:
+                        seen[key] = {"transit": name, "natal": natal_name,
+                                     "aspect": found[0], "orb": found[1]}
+        result.append({"month": f"{year}-{month:02d}", "positions": positions,
+                       "aspects": sorted(seen.values(), key=lambda x: x["orb"])})
+        month += 1
+        if month > 12:
+            year, month = year + 1, 1
+    return result

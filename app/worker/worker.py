@@ -23,7 +23,7 @@ from app.db.models import (
     OrderStatus, Result, ServicePrompt, ServiceType, TarotDraw, User,
 )
 from app.db.session import SessionMaker
-from app.natal.calc import calculate_natal
+from app.natal.calc import calculate_natal, calculate_transits, synastry_aspects
 from app.services.errors import log_error
 from app.services.formatting import markdown_to_telegram_html
 from app.services.texts import get_setting
@@ -64,26 +64,8 @@ async def _prepare_tarot(session: AsyncSession, order: Order) -> str:
     return "\n".join(lines)
 
 
-async def _prepare_natal(session: AsyncSession, order: Order) -> str:
-    profile = await session.get(BirthProfile, order.input_data["birth_profile_id"])
-    calc = await session.scalar(
-        select(NatalCalculation).where(NatalCalculation.order_id == order.id))
-    if not calc:
-        result = calculate_natal(
-            birth_date=profile.birth_date, birth_time=profile.birth_time,
-            time_accuracy=profile.time_accuracy,
-            lat=profile.latitude, lon=profile.longitude, tz_id=profile.tz_id,
-        )
-        profile.utc_offset_used = result["utc_offset_used"]
-        calc = NatalCalculation(
-            order_id=order.id, birth_profile_id=profile.id,
-            data=result["data"], warnings=result["warnings"],
-        )
-        session.add(calc)
-        await session.commit()
-
-    d = calc.data
-    lines = [f"Имя: {profile.label}", f"Дата: {profile.birth_date}",
+def _chart_lines(profile: BirthProfile, d: dict) -> list[str]:
+    lines = [f"Имя: {profile.label}", f"Дата рождения: {profile.birth_date}",
              f"Место: {profile.place_name}"]
     for planet, info in d.get("planets", {}).items():
         approx = " (приблизительно)" if info.get("approximate") else ""
@@ -95,9 +77,73 @@ async def _prepare_natal(session: AsyncSession, order: Order) -> str:
     if d.get("aspects"):
         lines.append("Аспекты: " + "; ".join(
             f"{a['a']}–{a['b']} {a['aspect']}" for a in d["aspects"][:20]))
+    return lines
+
+
+def _calc_profile(profile: BirthProfile) -> dict:
+    result = calculate_natal(
+        birth_date=profile.birth_date, birth_time=profile.birth_time,
+        time_accuracy=profile.time_accuracy,
+        lat=profile.latitude, lon=profile.longitude, tz_id=profile.tz_id,
+    )
+    profile.utc_offset_used = result["utc_offset_used"]
+    return result
+
+
+async def _prepare_natal(session: AsyncSession, order: Order) -> tuple[str, str]:
+    """Расчёт карты (и, по настройкам услуги, карты партнёра / транзитов).
+
+    Возвращает (факты для промпта, краткие данные для показа пользователю).
+
+    Маркеры в Service.required_fields: partner — синастрия, transits — прогноз на 12 месяцев.
+    """
+    profile = await session.get(BirthProfile, order.input_data["birth_profile_id"])
+    partner_id = order.input_data.get("partner_birth_profile_id")
+    partner = await session.get(BirthProfile, partner_id) if partner_id else None
+    markers = order.service.required_fields or []
+
+    calc = await session.scalar(
+        select(NatalCalculation).where(NatalCalculation.order_id == order.id))
+    if not calc:
+        result = _calc_profile(profile)
+        data, warnings = result["data"], list(result["warnings"])
+        if partner:
+            p_result = _calc_profile(partner)
+            data["partner"] = p_result["data"]
+            data["synastry"] = synastry_aspects(data["planets"], p_result["data"]["planets"])
+            warnings += [f"{partner.label}: {w}" for w in p_result["warnings"]]
+        if "transits" in markers:
+            today = datetime.now(timezone.utc).date()
+            data["transits_from"] = today.isoformat()
+            data["transits"] = calculate_transits(data["planets"], today)
+        calc = NatalCalculation(
+            order_id=order.id, birth_profile_id=profile.id,
+            data=data, warnings=warnings,
+        )
+        session.add(calc)
+        await session.commit()
+
+    d = calc.data
+    lines = _chart_lines(profile, d)
+    if partner and d.get("partner"):
+        lines += ["", "Второй человек:"] + _chart_lines(partner, d["partner"])
+    display = list(lines)  # таблицы синастрии и транзитов пользователю не показываем
+    if partner and d.get("partner"):
+        if d.get("synastry"):
+            lines += ["", "Синастрия (аспекты между картами, первый–второй): " + "; ".join(
+                f"{a['a']}–{a['b']} {a['aspect']}" for a in d["synastry"][:25])]
+    if d.get("transits"):
+        lines += ["", f"Транзиты медленных планет с {d.get('transits_from', '')} на 12 месяцев:"]
+        for m in d["transits"]:
+            pos = ", ".join(f"{k} в знаке {v}" for k, v in m["positions"].items())
+            asp = "; ".join(f"{a['transit']} {a['aspect']} натал. {a['natal']}"
+                            for a in m["aspects"][:8]) or "точных аспектов нет"
+            lines.append(f"{m['month']}: {pos}. Аспекты: {asp}")
     if calc.warnings:
-        lines.append("Предупреждения: " + " ".join(calc.warnings))
-    return "\n".join(lines)
+        tail = ["", "Предупреждения: " + " ".join(calc.warnings)]
+        lines += tail
+        display += tail
+    return "\n".join(lines), "\n".join(display)
 
 
 async def generate_result(ctx: dict, order_id: int) -> None:
@@ -121,8 +167,9 @@ async def generate_result(ctx: dict, order_id: int) -> None:
             # --- данные для промпта ---
             if order.service.type == ServiceType.tarot:
                 facts = await _prepare_tarot(session, order)
+                shown_facts = facts
             else:
-                facts = await _prepare_natal(session, order)
+                facts, shown_facts = await _prepare_natal(session, order)
 
             prompt_row = await session.scalar(
                 select(ServicePrompt).where(
@@ -188,7 +235,7 @@ async def generate_result(ctx: dict, order_id: int) -> None:
             text = markdown_to_telegram_html(
                 ai["text"][:order.service.max_output_chars]
             )
-            full_text = f"<b>{order.service.title}</b>\n\n{facts}\n\n{text}\n\n{disclaimer}"
+            full_text = f"<b>{order.service.title}</b>\n\n{shown_facts}\n\n{text}\n\n{disclaimer}"
 
             session.add(Result(order_id=order.id, user_id=order.user_id, text=full_text))
             order.status = OrderStatus.completed

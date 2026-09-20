@@ -11,23 +11,22 @@ from app.services.texts import get_setting
 
 async def main_menu(session: AsyncSession) -> ReplyKeyboardMarkup:
     b = {k: await get_setting(session, k) for k in (
-        "btn_daily", "btn_tarot", "btn_natal", "btn_results",
-        "btn_support", "btn_terms", "btn_privacy",
+        "btn_daily", "btn_tarot", "btn_natal", "btn_results", "btn_support",
     )}
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=b["btn_daily"])],
             [KeyboardButton(text=b["btn_tarot"]), KeyboardButton(text=b["btn_natal"])],
             [KeyboardButton(text=b["btn_results"]), KeyboardButton(text=b["btn_support"])],
-            [KeyboardButton(text=b["btn_terms"]), KeyboardButton(text=b["btn_privacy"])],
         ],
         resize_keyboard=True,
     )
 
 
-def consent_kb() -> InlineKeyboardMarkup:
+async def consent_kb(session: AsyncSession) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ Принимаю условия", callback_data="consent:accept"),
+        InlineKeyboardButton(text=await get_setting(session, "btn_start") or "НАЧАТЬ",
+                             callback_data="consent:accept"),
     ]])
 
 
