@@ -1,16 +1,88 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Тексты бота{% endblock %}
 {% block content %}
-<h2>Тексты и настройки</h2>
-<form method="post" action="/settings" class="card">
-  {% for key, value in values.items() %}
-    <label>{{ key }}
-      {% if value|length > 60 %}
-        <textarea name="{{ key }}" rows="3">{{ value }}</textarea>
-      {% else %}
-        <input name="{{ key }}" value="{{ value }}">
-      {% endif %}
-    </label>
-  {% endfor %}
-  <button type="submit">Сохранить</button>
+<div class="page-head">
+  <div>
+    <h1>Тексты бота</h1>
+    <p>Всё, что бот пишет пользователям. Выделите слово или фразу и выберите оформление на панели над текстом.</p>
+  </div>
+</div>
+
+{% if errors %}
+  <div class="alert error">Изменения не сохранены — исправьте поля, отмеченные красным.</div>
+{% endif %}
+<div class="alert info">Описания услуг и надписи на их кнопках редактируются в разделе <a href="/services">Услуги</a>.</div>
+
+<form method="post" action="/settings" data-guard>
+<div class="texts-layout">
+  <aside class="texts-nav">
+    <input type="search" class="search" placeholder="🔍  Поиск по текстам…" data-text-search aria-label="Поиск по текстам">
+    <nav>
+      {% for g in groups %}
+        <a href="#{{ g.id }}">{{ g.title }} <span class="count">{{ g.items|length }}</span></a>
+      {% endfor %}
+    </nav>
+  </aside>
+
+  <div>
+    {% for g in groups %}
+    <section class="card group-card" id="{{ g.id }}">
+      <div class="card-head"><h2>{{ g.title }}</h2></div>
+      {% for item in g.items %}
+        {% set value = values[item.key] %}
+        {% set err = errors.get(item.key) %}
+        <div class="text-item{{ ' has-error' if err }}"
+             data-search="{{ (item.label ~ ' ' ~ item.key ~ ' ' ~ (value|tg_plain))|lower }}">
+          <div class="text-item-head">
+            <label {% if item.kind != "html" %}for="f-{{ item.key }}"{% endif %}>{{ item.label }}</label>
+            {% if value != item.default %}<span class="badge violet">изменён</span>{% endif %}
+            <code class="key">{{ item.key }}</code>
+            <button type="button" class="ghost sm reset" data-reset title="Подставить стандартный текст (сохранится после нажатия «Сохранить»)">↺ Стандартный</button>
+          </div>
+
+          {% if item.kind == "html" %}
+            {{ ui.rich_editor(item.key, value, item.placeholders, show_source=err) }}
+          {% elif item.kind == "flag" %}
+            <input type="hidden" name="{{ item.key }}" value="false">
+            <label class="switch">
+              <input type="checkbox" id="f-{{ item.key }}" name="{{ item.key }}" value="true" {{ "checked" if value == "true" }}>
+              <span class="track"></span>
+            </label>
+          {% elif item.kind == "prompt" %}
+            <textarea id="f-{{ item.key }}" name="{{ item.key }}" rows="4">{{ value }}</textarea>
+          {% elif item.kind == "url" %}
+            <input type="url" id="f-{{ item.key }}" name="{{ item.key }}" value="{{ value }}" placeholder="https://…">
+          {% else %}
+            <input type="text" id="f-{{ item.key }}" name="{{ item.key }}" value="{{ value }}"
+                   {% if item.kind == "plain" %}maxlength="{{ ALERT_LIMIT }}"{% endif %}>
+          {% endif %}
+
+          {% if item.hint %}<div class="hint">{{ item.hint }}</div>{% endif %}
+          {% if item.kind == "button" %}
+            <div class="hint">Надпись на кнопке — Telegram не поддерживает на кнопках жирный и другое оформление.</div>
+          {% elif item.kind == "plain" %}
+            <div class="hint">Без оформления: такой текст Telegram показывает во всплывающем окне или внутри другого текста.</div>
+          {% elif item.placeholders and item.kind == "html" %}
+            <div class="hint">Слова в фигурных скобках бот заменит при отправке:
+              {% for p in item.placeholders %}<code>{{ '{' ~ p ~ '}' }}</code> — {{ PLACEHOLDERS.get(p, p) }}{{ "; " if not loop.last else "." }}{% endfor %}
+            </div>
+          {% endif %}
+          {{ ui.errors_list(err) }}
+          <textarea class="default-value" hidden>{{ item.default }}</textarea>
+        </div>
+      {% endfor %}
+    </section>
+    {% endfor %}
+
+    <div class="sticky-actions">
+      <div class="form-actions">
+        <span class="muted" data-dirty-note {{ "" if errors else "hidden" }}>Есть несохранённые изменения</span>
+        <button type="submit">Сохранить изменения</button>
+      </div>
+    </div>
+  </div>
+</div>
 </form>
+{{ ui.toast("Изменения сохранены" if saved else "") }}
 {% endblock %}

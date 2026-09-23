@@ -1,5 +1,6 @@
 """Команды /start, /help, /terms, /privacy, /pd_consent, /paysupport, /unsubscribe,
 /delete_my_data."""
+import html
 from pathlib import Path
 
 from aiogram import F, Router
@@ -16,7 +17,7 @@ from app.db.models import (
     BirthProfile, DailyCard, Order, Result, User, UserConsent,
 )
 from app.services.texts import (
-    DOCUMENTS, get_setting, render_consent_text, render_document, set_setting,
+    DOCUMENTS, get_setting, get_text, render_consent_text, render_document, set_setting,
 )
 
 router = Router()
@@ -93,20 +94,14 @@ async def consent_accept(cb: CallbackQuery, session: AsyncSession, db_user: User
         await cb.message.edit_reply_markup(reply_markup=None)
     except TelegramBadRequest:
         pass
-    await cb.message.answer("Главное меню 👇", reply_markup=await main_menu(session))
+    await cb.message.answer(await get_text(session, "main_menu_text"),
+                            reply_markup=await main_menu(session))
 
 
 @router.message(Command("help"))
 async def cmd_help(message: Message, session: AsyncSession):
-    await message.answer(
-        "Доступные команды:\n"
-        "/start — главное меню\n/terms — условия использования\n"
-        "/privacy — политика конфиденциальности\n"
-        "/pd_consent — согласие на обработку персональных данных\n"
-        "/paysupport — поддержка по оплате\n"
-        "/unsubscribe — отказ от рассылок\n/delete_my_data — удаление данных",
-        reply_markup=await main_menu(session),
-    )
+    await message.answer(await get_text(session, "help_text"),
+                         reply_markup=await main_menu(session))
 
 
 @router.message(Command("terms"))
@@ -133,39 +128,31 @@ async def cmd_paysupport(message: Message, session: AsyncSession):
 async def cmd_unsubscribe(message: Message, session: AsyncSession, db_user: User):
     db_user.subscribed = not db_user.subscribed
     await session.commit()
-    if db_user.subscribed:
-        await message.answer("Вы снова подписаны на рассылки. Отписаться: /unsubscribe")
-    else:
-        await message.answer(
-            "Вы отписаны от рекламных рассылок. Сообщения по вашим заказам "
-            "будут приходить по-прежнему. Подписаться снова: /unsubscribe"
-        )
+    key = "subscribe_done" if db_user.subscribed else "unsubscribe_done"
+    await message.answer(await get_text(session, key))
 
 
 @router.callback_query(F.data == "unsub:broadcast")
 async def unsub_from_broadcast(cb: CallbackQuery, session: AsyncSession, db_user: User):
     db_user.subscribed = False
     await session.commit()
-    await cb.answer("Вы отписаны от рассылок", show_alert=True)
+    await cb.answer(await get_text(session, "alert_unsubscribed"), show_alert=True)
 
 
 @router.message(Command("delete_my_data"))
-async def cmd_delete_data(message: Message, state: FSMContext):
+async def cmd_delete_data(message: Message, state: FSMContext, session: AsyncSession):
     await state.set_state(DeleteData.confirm)
-    await message.answer(
-        "Вы запросили удаление персональных данных: профиль, вопросы, данные рождения, "
-        "сохранённые результаты и настройки рассылок будут удалены. Платёжные сведения "
-        "сохраняются в минимально необходимом объёме для возвратов и учёта.\n\n"
-        "Для подтверждения отправьте слово: УДАЛИТЬ"
-    )
+    word = await get_setting(session, "delete_confirm_word")
+    await message.answer(await get_text(session, "delete_prompt", word=html.escape(word)))
 
 
 @router.message(DeleteData.confirm)
 async def delete_data_confirm(message: Message, state: FSMContext,
                               session: AsyncSession, db_user: User):
     await state.clear()
-    if (message.text or "").strip().upper() != "УДАЛИТЬ":
-        await message.answer("Удаление отменено.")
+    word = await get_setting(session, "delete_confirm_word")
+    if (message.text or "").strip().upper() != word.strip().upper():
+        await message.answer(await get_text(session, "delete_cancelled"))
         return
     await session.execute(delete(BirthProfile).where(BirthProfile.user_id == db_user.id))
     await session.execute(delete(Result).where(Result.user_id == db_user.id))
@@ -178,4 +165,4 @@ async def delete_data_confirm(message: Message, state: FSMContext,
     db_user.subscribed = False
     db_user.deleted_at = func.now()
     await session.commit()
-    await message.answer("Ваши персональные данные удалены/обезличены.")
+    await message.answer(await get_text(session, "delete_done"))

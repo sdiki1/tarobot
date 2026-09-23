@@ -1,0 +1,51 @@
+{# Общие элементы страниц админки #}
+
+{# Редактор текста для Telegram: форматирование видно сразу, в форму уходит HTML Telegram.
+   show_source — открыть сразу в режиме кода (когда в разметке ошибка) #}
+{% macro rich_editor(name, value, placeholders=(), limit=4096, tall=False, show_source=False) %}
+<div class="rte" data-limit="{{ limit }}"{% if show_source %} data-show-source{% endif %}>
+  <div class="rte-toolbar" role="toolbar" aria-label="Форматирование">
+    <button type="button" data-cmd="bold" title="Жирный (Ctrl+B)"><b>Ж</b></button>
+    <button type="button" data-cmd="italic" title="Курсив (Ctrl+I)"><i style="font-family:Georgia,serif">К</i></button>
+    <button type="button" data-cmd="underline" title="Подчёркнутый (Ctrl+U)"><u>Ч</u></button>
+    <button type="button" data-cmd="strikeThrough" title="Зачёркнутый"><s>З</s></button>
+    <span class="sep"></span>
+    <button type="button" data-wrap="tg-spoiler" title="Спойлер: текст скрыт, пока на него не нажмут">▒</button>
+    <button type="button" data-wrap="code" title="Моноширинный: копируется по нажатию" class="mono">{ }</button>
+    <button type="button" data-wrap="blockquote" title="Цитата">❝</button>
+    <button type="button" data-cmd="link" title="Ссылка (повторное нажатие убирает ссылку)">🔗</button>
+    <button type="button" data-cmd="clear" title="Убрать оформление у выделенного текста">⌫</button>
+    {% if placeholders %}
+      <span class="sep"></span>
+      {% for p in placeholders %}
+        <button type="button" class="chip" data-insert="{{ '{' ~ p ~ '}' }}" title="Вставить: {{ PLACEHOLDERS.get(p, p) }}">{{ '{' ~ p ~ '}' }}</button>
+      {% endfor %}
+    {% endif %}
+    <span class="spacer"></span>
+    <button type="button" class="src" data-cmd="source" title="Показать HTML-код">HTML</button>
+  </div>
+  <div class="rte-area{{ ' tall' if tall }}" contenteditable="true" spellcheck="true"></div>
+  <textarea class="rte-source" name="{{ name }}" hidden spellcheck="false">{{ value }}</textarea>
+  <div class="rte-foot"><span>Выделите текст и выберите оформление на панели</span><span class="rte-count"></span></div>
+</div>
+{% endmacro %}
+
+{% macro errors_list(errors) %}
+  {% for e in errors or [] %}<div class="field-error">{{ e }}</div>{% endfor %}
+{% endmacro %}
+
+{% macro order_status(value) %}
+  {% set s = ORDER_STATUS.get(value, (value, "")) %}<span class="badge {{ s[1] }}">{{ s[0] }}</span>
+{% endmacro %}
+
+{% macro job_status(value) %}
+  {% set s = JOB_STATUS.get(value, (value, "")) %}<span class="badge {{ s[1] }}">{{ s[0] }}</span>
+{% endmacro %}
+
+{% macro yes_no(flag, yes="Да", no="Нет") %}
+  {% if flag %}<span class="badge green">{{ yes }}</span>{% else %}<span class="badge">{{ no }}</span>{% endif %}
+{% endmacro %}
+
+{% macro toast(text) %}
+  {% if text %}<div class="toast" role="status">✓ {{ text }}</div>{% endif %}
+{% endmacro %}

@@ -1,6 +1,4 @@
 """Платные расклады Таро: каталог, сбор входных данных, промокод, счёт в Stars."""
-import html
-import re
 from datetime import datetime, timedelta, timezone
 
 from aiogram import F, Router
@@ -16,18 +14,15 @@ from app.bot.states import TarotOrder
 from app.config import get_settings
 from app.db.models import Order, OrderStatus, Service, ServiceType, User
 from app.services.promo import validate_promo
-from app.services.texts import get_setting
+from app.services.telegram_html import visible_text
+from app.services.texts import TEXTS, get_setting, get_text
 
 router = Router()
 
-FIELD_PROMPTS = {
-    "question": "Сформулируйте ваш вопрос:",
-    "name": "Введите ваше имя:",
-    "birth_date": "Введите вашу дату рождения (ДД.ММ.ГГГГ):",
-    "partner_name": "Введите имя другого человека:",
-    "situation": "Опишите ситуацию:",
-    "comment": "Дополнительные комментарии (или «-», если нет):",
-}
+
+def is_test_payer(user: User) -> bool:
+    settings = get_settings()
+    return settings.test_payment_enabled and user.id in settings.admin_ids
 
 
 async def is_tarot_button(message: Message, session: AsyncSession) -> bool:
@@ -43,14 +38,14 @@ async def catalog(message: Message, session: AsyncSession):
         .order_by(Service.sort_order)
     )).all()
     if not services:
-        await message.answer("Каталог пока пуст.")
+        await message.answer(await get_text(session, "tarot_empty"))
         return
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=f"{s.title} — {s.price_stars} ⭐",
                               callback_data=f"svc:{s.id}")]
         for s in services
     ])
-    await message.answer("🔮 Выберите расклад:", reply_markup=kb)
+    await message.answer(await get_text(session, "tarot_menu_text"), reply_markup=kb)
 
 
 @router.callback_query(F.data.startswith("svc:"))
@@ -58,7 +53,7 @@ async def service_selected(cb: CallbackQuery, state: FSMContext,
                            session: AsyncSession, db_user: User):
     service = await session.get(Service, int(cb.data.split(":")[1]))
     if not service or not service.is_active or service.is_archived:
-        await cb.answer("Услуга недоступна", show_alert=True)
+        await cb.answer(await get_text(session, "alert_service_unavailable"), show_alert=True)
         return
 
     # Лимит запросов на пользователя в сутки
@@ -70,8 +65,7 @@ async def service_selected(cb: CallbackQuery, state: FSMContext,
         )
     )
     if service.per_user_daily_limit and count >= service.per_user_daily_limit:
-        await cb.answer("Достигнут дневной лимит по этой услуге. Попробуйте завтра.",
-                        show_alert=True)
+        await cb.answer(await get_text(session, "alert_daily_limit"), show_alert=True)
         return
 
     fields = list(service.required_fields or [])
@@ -80,7 +74,8 @@ async def service_selected(cb: CallbackQuery, state: FSMContext,
 
     await state.set_state(TarotOrder.collecting)
     await state.update_data(service_id=service.id, fields=fields, field_idx=0, inputs={})
-    text = f"<b>{service.title}</b>\n{service.description}\nСтоимость: {service.price_stars} ⭐"
+    price = await get_text(session, "price_line", price=service.price_stars)
+    text = f"<b>{service.title}</b>\n{service.description}\n{price}"
     if service.image_file_id:
         await cb.message.answer_photo(service.image_file_id, caption=text)
     else:
@@ -94,7 +89,9 @@ async def _ask_next_field(message: Message, state: FSMContext,
     data = await state.get_data()
     fields, idx = data["fields"], data["field_idx"]
     if idx < len(fields):
-        await message.answer(FIELD_PROMPTS.get(fields[idx], f"Введите: {fields[idx]}"))
+        key = f"field_{fields[idx]}"
+        prompt = await get_text(session, key) if key in TEXTS else f"Введите: {fields[idx]}"
+        await message.answer(prompt)
         return
     # Все поля собраны — создаём заказ
     service = await session.get(Service, data["service_id"])
@@ -108,11 +105,9 @@ async def _ask_next_field(message: Message, state: FSMContext,
     await state.set_state(None)
     await state.update_data(order_id=order.id)
     await message.answer(
-        f"Заказ №{order.id} создан. Сумма: {order.final_price_stars} ⭐",
-        reply_markup=promo_kb(
-            order.id,
-            get_settings().test_payment_enabled and db_user.id in get_settings().admin_ids,
-        ),
+        await get_text(session, "order_created", order_id=order.id,
+                       price=order.final_price_stars),
+        reply_markup=await promo_kb(session, order.id, is_test_payer(db_user)),
     )
 
 
@@ -127,9 +122,9 @@ async def collect_field(message: Message, state: FSMContext,
 
 
 @router.callback_query(F.data == "promo:enter")
-async def promo_enter(cb: CallbackQuery, state: FSMContext):
+async def promo_enter(cb: CallbackQuery, state: FSMContext, session: AsyncSession):
     await state.set_state(TarotOrder.promo)
-    await cb.message.answer("Введите промокод:")
+    await cb.message.answer(await get_text(session, "promo_ask"))
     await cb.answer()
 
 
@@ -144,17 +139,14 @@ async def promo_apply(message: Message, state: FSMContext,
     await state.set_state(None)
     if err:
         await message.answer(
-            f"❌ {err}",
-            reply_markup=promo_kb(
-                order.id,
-                get_settings().test_payment_enabled and db_user.id in get_settings().admin_ids,
-            ),
+            await get_text(session, "promo_error", error=err),
+            reply_markup=await promo_kb(session, order.id, is_test_payer(db_user)),
         )
         return
     order.promo_code_id = promo.id
     order.final_price_stars = final
     await session.commit()
-    await message.answer(f"✅ Промокод применён. Итог: {final} ⭐")
+    await message.answer(await get_text(session, "promo_applied", price=final))
     await send_invoice(message, session, order)
 
 
@@ -163,7 +155,7 @@ async def promo_skip(cb: CallbackQuery, state: FSMContext, session: AsyncSession
     data = await state.get_data()
     order = await session.get(Order, data.get("order_id"))
     if not order:
-        await cb.answer("Заказ не найден", show_alert=True)
+        await cb.answer(await get_text(session, "alert_order_not_found"), show_alert=True)
         return
     await cb.answer()
     await send_invoice(cb.message, session, order)
@@ -183,8 +175,7 @@ def invoice_title(title: str, limit: int = 32) -> str:
 def invoice_description(service: Service, limit: int = 240) -> str:
     """Описание счёта: без HTML-разметки, обрезка по словам. Лимит Telegram — 255 символов,
     запас — на эмодзи, которые считаются за два символа."""
-    text = html.unescape(re.sub(r"<[^>]+>", "", service.description or "")).strip()
-    text = text or service.title
+    text = visible_text(service.description).strip() or service.title
     if len(text) <= limit:
         return text
     cut = text[:limit - 1].rsplit(" ", 1)[0]

@@ -1,30 +1,57 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Промокоды{% endblock %}
 {% block content %}
-<h2>Промокоды</h2>
-<div class="card">
-<form method="post" action="/promos">
-  <label>Код <input name="code" required></label>
-  <label>Скидка % <input type="number" name="discount_percent" min="1" max="100"></label>
-  <label>Или скидка в Stars <input type="number" name="discount_stars" min="1"></label>
-  <label>Максимум активаций (пусто = без лимита) <input type="number" name="max_activations"></label>
-  <label>Лимит на пользователя <input type="number" name="per_user_limit" value="1"></label>
-  <label>Минимальная сумма заказа ⭐ <input type="number" name="min_order_stars" value="0"></label>
-  <label>Действует с (ГГГГ-ММ-ДД) <input name="starts_at"></label>
-  <label>Действует до <input name="ends_at"></label>
-  <button>Создать</button>
-</form>
+<div class="page-head">
+  <div><h1>Промокоды</h1><p>Скидки на услуги: в процентах или в звёздах</p></div>
 </div>
-<table>
-<tr><th>Код</th><th>Скидка</th><th>Лимиты</th><th>Период</th><th>Активен</th><th></th></tr>
-{% for p in promos %}
-<tr>
-  <td>{{ p.code }}</td>
-  <td>{{ p.discount_percent ~ "%" if p.discount_percent else (p.discount_stars ~ " ⭐" if p.discount_stars else "—") }}</td>
-  <td>{{ p.max_activations or "∞" }} / {{ p.per_user_limit }} на чел., мин. {{ p.min_order_stars }} ⭐</td>
-  <td>{{ p.starts_at.strftime("%d.%m.%y") if p.starts_at else "…" }} — {{ p.ends_at.strftime("%d.%m.%y") if p.ends_at else "…" }}</td>
-  <td>{{ "✅" if p.is_active else "—" }}</td>
-  <td><form class="inline" method="post" action="/promos/{{ p.id }}/toggle"><button>{{ "Выключить" if p.is_active else "Включить" }}</button></form></td>
-</tr>
-{% endfor %}
-</table>
+
+<div class="card">
+  <div class="card-head"><h2>Новый промокод</h2></div>
+  <form method="post" action="/promos">
+    <div class="grid-3">
+      <div class="field"><label for="code">Код</label><input type="text" id="code" name="code" required placeholder="Например, STARS20"></div>
+      <div class="field"><label for="discount_percent">Скидка, %</label><input type="number" id="discount_percent" name="discount_percent" min="1" max="100"></div>
+      <div class="field"><label for="discount_stars">…или скидка в ⭐</label><input type="number" id="discount_stars" name="discount_stars" min="1"></div>
+    </div>
+    <div class="grid-3">
+      <div class="field"><label for="max_activations">Всего активаций</label><input type="number" id="max_activations" name="max_activations" placeholder="Без ограничений"></div>
+      <div class="field"><label for="per_user_limit">На одного человека</label><input type="number" id="per_user_limit" name="per_user_limit" value="1"></div>
+      <div class="field"><label for="min_order_stars">Минимальная сумма заказа, ⭐</label><input type="number" id="min_order_stars" name="min_order_stars" value="0"></div>
+    </div>
+    <div class="grid-3">
+      <div class="field"><label for="starts_at">Действует с</label><input type="date" id="starts_at" name="starts_at"></div>
+      <div class="field"><label for="ends_at">Действует до</label><input type="date" id="ends_at" name="ends_at"></div>
+    </div>
+    <div class="form-actions"><button>Создать промокод</button></div>
+  </form>
+</div>
+
+<div class="card flush">
+  {% if promos %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Код</th><th>Скидка</th><th>Ограничения</th><th>Период</th><th>Статус</th><th></th></tr></thead>
+      <tbody>
+      {% for p in promos %}
+        <tr>
+          <td><b class="mono">{{ p.code }}</b></td>
+          <td>{{ p.discount_percent ~ " %" if p.discount_percent else (p.discount_stars ~ " ⭐" if p.discount_stars else "—") }}</td>
+          <td class="muted">{{ p.max_activations or "∞" }} всего · {{ p.per_user_limit }} на человека{% if p.min_order_stars %} · от {{ p.min_order_stars }} ⭐{% endif %}</td>
+          <td class="muted">{{ p.starts_at.strftime("%d.%m.%y") if p.starts_at else "…" }} — {{ p.ends_at.strftime("%d.%m.%y") if p.ends_at else "…" }}</td>
+          <td>{{ ui.yes_no(p.is_active, "Активен", "Выключен") }}</td>
+          <td class="actions">
+            <form class="inline" method="post" action="/promos/{{ p.id }}/toggle">
+              <button class="secondary sm">{{ "Выключить" if p.is_active else "Включить" }}</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">Промокодов пока нет</div>
+  {% endif %}
+</div>
 {% endblock %}

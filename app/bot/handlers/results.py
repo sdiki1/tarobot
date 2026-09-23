@@ -1,18 +1,20 @@
 """«Мои результаты» и «Поддержка»: история заказов, повторное открытие результата."""
+import html
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Order, OrderStatus, Result, User
-from app.services.texts import get_setting
+from app.services.texts import get_setting, get_text
 
 router = Router()
 
-STATUS_RU = {
-    "created": "создан", "invoiced": "ожидает оплаты", "paid": "оплачен, готовится",
-    "completed": "готов", "failed": "ошибка", "refunded": "возврат", "cancelled": "отменён",
-}
+
+async def status_label(session: AsyncSession, order: Order) -> str:
+    """Статус заказа словами (тексты status_* в админке)."""
+    return await get_setting(session, f"status_{order.status.value}") or order.status.value
 
 
 async def is_results_button(message: Message, session: AsyncSession) -> bool:
@@ -30,14 +32,14 @@ async def my_results(message: Message, session: AsyncSession, db_user: User):
         .order_by(Order.created_at.desc()).limit(10)
     )).all()
     if not orders:
-        await message.answer("У вас пока нет заказов.")
+        await message.answer(await get_text(session, "results_empty"))
         return
     rows = []
     for o in orders:
         label = (f"№{o.id} · {o.service.title} · {o.final_price_stars}⭐ · "
-                 f"{STATUS_RU.get(o.status.value, o.status.value)}")
+                 f"{await status_label(session, o)}")
         rows.append([InlineKeyboardButton(text=label[:64], callback_data=f"res:{o.id}")])
-    await message.answer("📜 Последние заказы:",
+    await message.answer(await get_text(session, "results_title"),
                          reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
 
 
@@ -46,7 +48,7 @@ async def open_result(cb: CallbackQuery, session: AsyncSession, db_user: User):
     order_id = int(cb.data.split(":")[1])
     order = await session.get(Order, order_id)
     if not order or order.user_id != db_user.id:
-        await cb.answer("Заказ не найден", show_alert=True)
+        await cb.answer(await get_text(session, "alert_order_not_found"), show_alert=True)
         return
     result = await session.scalar(select(Result).where(Result.order_id == order_id))
     await cb.answer()
@@ -54,10 +56,10 @@ async def open_result(cb: CallbackQuery, session: AsyncSession, db_user: User):
         for i in range(0, len(result.text), 4000):
             await cb.message.answer(result.text[i:i + 4000])
     else:
-        await cb.message.answer(
-            f"Заказ №{order.id}: {STATUS_RU.get(order.status.value, order.status.value)}. "
-            "Результат пока не готов."
-        )
+        await cb.message.answer(await get_text(
+            session, "result_not_ready", order_id=order.id,
+            status=html.escape(await status_label(session, order)),
+        ))
 
 
 @router.message(is_support_button)

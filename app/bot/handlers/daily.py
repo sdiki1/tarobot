@@ -8,7 +8,7 @@ from app.db.models import AIRequest, User
 from app.services.daily import DailyDeckUnavailable, get_or_create_daily_card
 from app.services.errors import log_error
 from app.services.formatting import markdown_to_telegram_html
-from app.services.texts import get_setting
+from app.services.texts import get_setting, get_text
 
 router = Router()
 
@@ -24,16 +24,18 @@ async def daily_card(message: Message, session: AsyncSession, db_user: User):
     except DailyDeckUnavailable as exc:
         await log_error(session, "daily_card", exc, user_id=db_user.id)
         await session.commit()
-        await message.answer(
-            "Колода карт временно недоступна. Пожалуйста, попробуйте ещё раз позже."
-        )
+        await message.answer(await get_text(session, "daily_unavailable"))
         return
 
-    header = (f"🃏 Карта дня: <b>{card.card.name_ru}</b>"
-              f"{' (перевёрнутая)' if card.is_reversed else ''}")
+    reversed_mark = ""
+    if card.is_reversed:
+        reversed_mark = " " + await get_text(session, "daily_reversed_mark")
+    header = await get_text(session, "daily_header",
+                            card=card.card.name_ru, reversed=reversed_mark)
 
     if not created and card.text:
-        await message.answer(f"{header}\n\n{card.text}\n\n<i>Новая карта будет доступна завтра.</i>")
+        note = await get_text(session, "daily_repeat_note")
+        await message.answer(f"{header}\n\n{card.text}\n\n{note}")
         return
 
     text = ""
@@ -43,11 +45,7 @@ async def daily_card(message: Message, session: AsyncSession, db_user: User):
             try:
                 position = "перевёрнутом" if card.is_reversed else "прямом"
                 result = await openai_client.generate(
-                    system_prompt=(
-                        "Ты — доброжелательный таролог. Дай краткое значение карты дня, "
-                        "совет на день и одну рекомендацию-предупреждение. До 700 символов, "
-                        "по-русски, без медицинских и финансовых советов."
-                    ),
+                    system_prompt=await get_setting(session, "daily_ai_prompt"),
                     user_prompt=f"Карта дня: {card.card.name_ru} в {position} положении.",
                     max_output_tokens=512,
                 )
@@ -64,7 +62,7 @@ async def daily_card(message: Message, session: AsyncSession, db_user: User):
 
     if not text:
         meaning = (card.card.reversed_meaning if card.is_reversed
-                   else card.card.upright_meaning) or "Прислушайтесь к себе сегодня."
+                   else card.card.upright_meaning) or await get_text(session, "daily_fallback")
         text = meaning
 
     card.text = text

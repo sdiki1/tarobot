@@ -1,29 +1,58 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Пользователи{% endblock %}
 {% block content %}
-<h2>Пользователи</h2>
-<form method="get"><input name="q" value="{{ q }}" placeholder="Telegram ID или username" style="width:300px;display:inline-block"> <button>Найти</button></form>
-<table>
-<tr><th>ID</th><th>Username</th><th>Имя</th><th>Регистрация</th><th>Активность</th>
-    <th>Рассылка</th><th>Блок бота</th><th>Бан</th><th></th></tr>
-{% for u in users %}
-<tr>
-  <td>{{ u.id }}</td>
-  <td>{{ u.username or "—" }}</td>
-  <td>{{ u.first_name or "—" }}</td>
-  <td>{{ u.created_at.strftime("%d.%m.%Y") }}</td>
-  <td>{{ u.last_active_at.strftime("%d.%m.%Y") }}</td>
-  <td>{{ "✅" if u.subscribed else "🔕" }}</td>
-  <td>{{ "🚫" if u.is_blocked_bot else "—" }}</td>
-  <td>{{ "⛔" if u.is_banned else "—" }}</td>
-  <td>
-    <a href="/orders?status=&q={{ u.id }}">заказы</a>
-    <form class="inline" method="post" action="/users/{{ u.id }}/toggle_ban">
-      <button>{{ "Разбан" if u.is_banned else "Бан" }}</button></form>
-    <form class="inline" method="post" action="/users/{{ u.id }}/message">
-      <input name="text" placeholder="Сообщение" style="width:160px;display:inline-block">
-      <button>➤</button></form>
-  </td>
-</tr>
-{% endfor %}
-</table>
+<div class="page-head">
+  <div><h1>Пользователи</h1><p>{{ "Результаты поиска" if q else "Последние 100 пользователей" }}</p></div>
+  <form method="get" class="btn-row">
+    <input type="search" name="q" value="{{ q }}" placeholder="Telegram ID или username" style="width:260px">
+    <button class="secondary">Найти</button>
+  </form>
+</div>
+
+<div class="card flush">
+  {% if users %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Пользователь</th><th>Регистрация</th><th>Активность</th><th>Статус</th><th>Сообщение от бота</th><th></th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr>
+          <td>
+            <b>{{ u.first_name or "Без имени" }}</b>
+            <div class="muted small">{% if u.username %}@{{ u.username }} · {% endif %}<span class="mono">{{ u.id }}</span></div>
+          </td>
+          <td class="muted">{{ u.created_at.strftime("%d.%m.%Y") }}</td>
+          <td class="muted">{{ u.last_active_at.strftime("%d.%m.%Y") }}</td>
+          <td>
+            <div class="btn-row" style="gap:4px">
+              {% if u.is_banned %}<span class="badge red">Заблокирован</span>{% endif %}
+              {% if u.is_blocked_bot %}<span class="badge yellow">Остановил бота</span>{% endif %}
+              {% if u.deleted_at %}<span class="badge">Данные удалены</span>{% endif %}
+              {% if not u.subscribed %}<span class="badge">Без рассылок</span>{% endif %}
+              {% if not (u.is_banned or u.is_blocked_bot or u.deleted_at or not u.subscribed) %}<span class="badge green">Активен</span>{% endif %}
+            </div>
+          </td>
+          <td>
+            <form class="inline" method="post" action="/users/{{ u.id }}/message">
+              <input type="text" name="text" placeholder="Текст сообщения" required style="width:180px">
+              <button class="secondary sm" title="Отправить">➤</button>
+            </form>
+          </td>
+          <td class="actions">
+            <a class="btn ghost sm" href="/orders?user={{ u.id }}">Заказы</a>
+            <form class="inline" method="post" action="/users/{{ u.id }}/toggle_ban"
+                  onsubmit="return confirm('{{ 'Разблокировать' if u.is_banned else 'Заблокировать' }} пользователя?')">
+              <button class="{{ 'secondary' if u.is_banned else 'danger' }} sm">{{ "Разблокировать" if u.is_banned else "Заблокировать" }}</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">Никого не нашли</div>
+  {% endif %}
+</div>
 {% endblock %}

@@ -1,22 +1,46 @@
 {% extends "base.html" %}
+{% block title %}Ошибки{% endblock %}
 {% block content %}
-<h2>Журнал ошибок</h2>
-<table>
-<tr><th>Когда</th><th>Компонент</th><th>Тип</th><th>Сообщение</th><th>Пользователь</th><th>Заказ</th><th>Статус</th><th></th></tr>
-{% for e in errors %}
-<tr>
-  <td>{{ e.created_at.strftime("%d.%m %H:%M") }}</td>
-  <td>{{ e.component }}</td>
-  <td>{{ e.error_type }}</td>
-  <td><details><summary>{{ e.message[:80] }}</summary><pre style="white-space:pre-wrap">{{ e.traceback or "" }}</pre></details></td>
-  <td>{{ e.user_id or "—" }}</td>
-  <td>{% if e.order_id %}<a href="/orders/{{ e.order_id }}">{{ e.order_id }}</a>{% else %}—{% endif %}</td>
-  <td>{{ "✅ решено" if e.is_resolved else "—" }}</td>
-  <td>{% if not e.is_resolved %}
-    <form class="inline" method="post" action="/errors/{{ e.id }}/resolve">
-      <input name="comment" placeholder="Комментарий" style="width:140px;display:inline-block">
-      <button>Решено</button></form>{% endif %}</td>
-</tr>
-{% endfor %}
-</table>
+<div class="page-head">
+  <div><h1>Журнал ошибок</h1><p>Последние 100 записей. Нажмите на сообщение, чтобы увидеть подробности.</p></div>
+</div>
+
+<div class="card flush">
+  {% if errors %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Когда</th><th>Где</th><th>Сообщение</th><th>Пользователь</th><th>Заказ</th><th></th></tr></thead>
+      <tbody>
+      {% for e in errors %}
+        <tr>
+          <td class="muted" style="white-space:nowrap">{{ e.created_at.strftime("%d.%m %H:%M") }}</td>
+          <td><span class="badge">{{ e.component }}</span><div class="muted small">{{ e.error_type }}</div></td>
+          <td style="max-width:420px">
+            <details>
+              <summary>{{ e.message[:120] }}</summary>
+              {% if e.traceback %}<pre class="small" style="margin-top:8px">{{ e.traceback }}</pre>{% endif %}
+            </details>
+            {% if e.admin_comment %}<div class="muted small">💬 {{ e.admin_comment }}</div>{% endif %}
+          </td>
+          <td class="mono">{{ e.user_id or "—" }}</td>
+          <td>{% if e.order_id %}<a href="/orders/{{ e.order_id }}">№{{ e.order_id }}</a>{% else %}—{% endif %}</td>
+          <td class="actions">
+            {% if e.is_resolved %}
+              <span class="badge green">Решено</span>
+            {% else %}
+              <form class="inline" method="post" action="/errors/{{ e.id }}/resolve">
+                <input type="text" name="comment" placeholder="Комментарий" style="width:150px">
+                <button class="secondary sm">Решено</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">Ошибок нет 🎉</div>
+  {% endif %}
+</div>
 {% endblock %}

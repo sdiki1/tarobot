@@ -1,27 +1,74 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Рассылки{% endblock %}
 {% block content %}
-<h2>Рассылки</h2>
-<div class="card">
-<form method="post" action="/broadcasts">
-  <label>Текст <textarea name="text" rows="4" required></textarea></label>
-  <label>Аудитория
-    <select name="audience">
-      {% for k, v in audiences.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
-    </select></label>
-  <label>Кнопка: текст <input name="button_text"></label>
-  <label>Кнопка: ссылка <input name="button_url"></label>
-  <label><input type="checkbox" name="test_only" value="true" style="width:auto"> Только тест администратору</label>
-  <button onclick="return confirm('Запустить рассылку?')">Запустить</button>
-</form>
+<div class="page-head">
+  <div><h1>Рассылки</h1><p>Сообщение всем подписанным пользователям. Под каждой рассылкой бот добавляет кнопку отписки.</p></div>
 </div>
-<table>
-<tr><th>ID</th><th>Текст</th><th>Статус</th><th>Всего</th><th>Отправлено</th><th>Блок</th><th>Ошибки</th><th>Пропущено</th></tr>
-{% for b in items %}
-<tr>
-  <td>{{ b.id }}</td><td>{{ b.text[:60] }}…</td><td>{{ b.status }}</td>
-  <td>{{ b.total }}</td><td>{{ b.sent }}</td><td>{{ b.blocked }}</td>
-  <td>{{ b.failed }}</td><td>{{ b.unsubscribed_skipped }}</td>
-</tr>
-{% endfor %}
-</table>
+
+{% if errors %}<div class="alert error">Рассылка не отправлена — исправьте текст.</div>{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>Новая рассылка</h2></div>
+  <form method="post" action="/broadcasts" data-guard>
+    <div class="field{{ ' has-error' if errors }}">
+      <label>Текст</label>
+      {{ ui.rich_editor("text", form.text, tall=True, show_source=errors) }}
+      {{ ui.errors_list(errors) }}
+    </div>
+    <div class="grid-3">
+      <div class="field">
+        <label for="audience">Кому</label>
+        <select id="audience" name="audience">
+          {% for k, v in audiences.items() %}<option value="{{ k }}" {{ "selected" if form.audience == k }}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="button_text">Кнопка-ссылка: надпись</label>
+        <input type="text" id="button_text" name="button_text" value="{{ form.button_text }}" placeholder="Необязательно">
+      </div>
+      <div class="field">
+        <label for="button_url">Кнопка-ссылка: адрес</label>
+        <input type="url" id="button_url" name="button_url" value="{{ form.button_url }}" placeholder="https://…">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button name="test_only" value="true" class="secondary">🧪 Отправить тест администраторам</button>
+      <button onclick="return confirm('Отправить рассылку всем выбранным пользователям?')">📣 Запустить рассылку</button>
+    </div>
+  </form>
+</div>
+
+<div class="card flush">
+  <div class="card-head"><h2>История</h2></div>
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Текст</th><th>Статус</th><th class="num">Всего</th><th class="num">Доставлено</th><th class="num">Остановили бота</th><th class="num">Ошибки</th><th class="num">Отписаны</th><th>Дата</th></tr></thead>
+      <tbody>
+      {% for b in items %}
+        {% set plain = b.text|tg_plain %}
+        <tr>
+          <td style="max-width:340px">{{ plain[:90] }}{{ "…" if plain|length > 90 }}</td>
+          <td>
+            {% if b.status == "done" %}<span class="badge green">Завершена</span>
+            {% elif b.status == "running" %}<span class="badge blue">Идёт</span>
+            {% else %}<span class="badge">В очереди</span>{% endif %}
+          </td>
+          <td class="num">{{ b.total }}</td>
+          <td class="num">{{ b.sent }}</td>
+          <td class="num">{{ b.blocked }}</td>
+          <td class="num">{{ b.failed }}</td>
+          <td class="num">{{ b.unsubscribed_skipped }}</td>
+          <td class="muted">{{ b.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">Рассылок ещё не было</div>
+  {% endif %}
+</div>
+{{ ui.toast(toast) }}
 {% endblock %}

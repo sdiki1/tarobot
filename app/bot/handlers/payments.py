@@ -19,7 +19,7 @@ from sqlalchemy.orm import lazyload
 from app.config import get_settings
 from app.db.models import GenerationJob, Order, OrderStatus, Payment, User
 from app.services.errors import log_error
-from app.services.texts import get_setting
+from app.services.texts import get_text
 
 router = Router()
 
@@ -52,14 +52,16 @@ async def pre_checkout(query: PreCheckoutQuery, session: AsyncSession):
     try:
         order_id = int(query.invoice_payload.split(":")[1])
     except (IndexError, ValueError):
-        await query.answer(ok=False, error_message="Некорректный заказ.")
+        await query.answer(ok=False,
+                           error_message=await get_text(session, "checkout_err_invalid"))
         return
     order = await session.get(Order, order_id)
     if not order or order.status not in (OrderStatus.created, OrderStatus.invoiced):
-        await query.answer(ok=False, error_message="Заказ не найден или уже оплачен.")
+        await query.answer(ok=False, error_message=await get_text(session, "checkout_err_paid"))
         return
     if order.final_price_stars != query.total_amount:
-        await query.answer(ok=False, error_message="Сумма заказа изменилась, создайте заказ заново.")
+        await query.answer(ok=False,
+                           error_message=await get_text(session, "checkout_err_amount"))
         return
     await query.answer(ok=True)
 
@@ -93,7 +95,7 @@ async def successful_payment(message: Message, session: AsyncSession,
         await session.rollback()
         return
 
-    await message.answer(await get_setting(session, "generation_in_progress"))
+    await message.answer(await get_text(session, "generation_in_progress"))
 
     await _enqueue_generation(session, order, db_user.id)
 
@@ -143,6 +145,6 @@ async def test_payment(callback: CallbackQuery, session: AsyncSession, db_user: 
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(
         "🧪 Тестовая оплата — Stars не списаны.\n\n"
-        + await get_setting(session, "generation_in_progress")
+        + await get_text(session, "generation_in_progress")
     )
     await _enqueue_generation(session, order, db_user.id)

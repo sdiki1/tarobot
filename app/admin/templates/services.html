@@ -1,22 +1,44 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Услуги{% endblock %}
 {% block content %}
-<h2>Услуги</h2>
-<p><a href="/services/0"><button>+ Новая услуга</button></a></p>
-<table>
-<tr><th>ID</th><th>Название</th><th>Тип</th><th>Цена ⭐</th><th>Карт</th><th>Активна</th><th>Порядок</th><th></th></tr>
-{% for s in services %}
-<tr>
-  <td>{{ s.id }}</td>
-  <td><a href="/services/{{ s.id }}">{{ s.title }}</a></td>
-  <td>{{ s.type.value }}</td>
-  <td>{{ s.price_stars }}</td>
-  <td>{{ s.cards_count }}</td>
-  <td>{{ "✅" if s.is_active else "—" }}</td>
-  <td>{{ s.sort_order }}</td>
-  <td><form class="inline" method="post" action="/services/{{ s.id }}/archive"
-        onsubmit="return confirm('Архивировать услугу?')">
-      <button class="danger">Архив</button></form></td>
-</tr>
+<div class="page-head">
+  <div><h1>Услуги</h1><p>Расклады Таро и разделы натальной карты: цены, описания, инструкции для ИИ.</p></div>
+  <a class="btn" href="/services/0">＋ Новая услуга</a>
+</div>
+
+{% for type_value, type_title in [("tarot", "🔮 Расклады Таро"), ("natal", "✨ Натальная карта")] %}
+  {% set items = services|selectattr("type.value", "equalto", type_value)|list %}
+  <div class="card flush">
+    <div class="card-head"><h2>{{ type_title }}</h2></div>
+    {% if items %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Название</th><th class="num">Цена</th>{% if type_value == "tarot" %}<th class="num">Карт</th>{% endif %}<th>Статус</th><th class="num">Порядок</th><th></th></tr></thead>
+        <tbody>
+        {% for s in items %}
+          <tr>
+            <td><a href="/services/{{ s.id }}"><b>{{ s.title }}</b></a><div class="muted small mono">{{ s.code }}</div></td>
+            <td class="num">{{ s.price_stars }} ⭐</td>
+            {% if type_value == "tarot" %}<td class="num">{{ s.cards_count }}</td>{% endif %}
+            <td>{{ ui.yes_no(s.is_active, "Активна", "Скрыта") }}</td>
+            <td class="num">{{ s.sort_order }}</td>
+            <td class="actions">
+              <a class="btn secondary sm" href="/services/{{ s.id }}">Изменить</a>
+              <form class="inline" method="post" action="/services/{{ s.id }}/archive"
+                    onsubmit="return confirm('Убрать услугу в архив? Пользователи перестанут её видеть.')">
+                <button class="danger sm">В архив</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty">Услуг пока нет</div>
+    {% endif %}
+  </div>
 {% endfor %}
-</table>
+{{ ui.toast("Услуга сохранена" if saved else "") }}
 {% endblock %}

@@ -1,25 +1,43 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Заказы{% endblock %}
 {% block content %}
-<h2>Заказы</h2>
-<form method="get" class="inline">
-  <select name="status" onchange="this.form.submit()" style="width:auto">
-    <option value="">Все статусы</option>
-    {% for st in ["created","invoiced","paid","completed","failed","refunded","cancelled"] %}
-      <option value="{{ st }}" {{ "selected" if status==st }}>{{ st }}</option>
-    {% endfor %}
-  </select>
-</form>
-<table>
-<tr><th>№</th><th>Пользователь</th><th>Услуга</th><th>Статус</th><th>Сумма ⭐</th><th>Создан</th></tr>
-{% for o in orders %}
-<tr>
-  <td><a href="/orders/{{ o.id }}">{{ o.id }}</a></td>
-  <td>{{ o.user_id }}</td>
-  <td>{{ o.service.title }}</td>
-  <td>{{ o.status.value }}</td>
-  <td>{{ o.final_price_stars }}</td>
-  <td>{{ o.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
-</tr>
-{% endfor %}
-</table>
+<div class="page-head">
+  <div>
+    <h1>Заказы</h1>
+    <p>{% if user %}Заказы пользователя <b>{{ user }}</b> · <a href="/orders">показать все</a>{% else %}Последние 200 заказов{% endif %}</p>
+  </div>
+</div>
+
+<div class="pills">
+  {% set user_q = "&user=" ~ user if user else "" %}
+  <a class="pill {{ 'active' if not status }}" href="/orders?status={{ user_q }}">Все</a>
+  {% for st, info in ORDER_STATUS.items() %}
+    <a class="pill {{ 'active' if status == st }}" href="/orders?status={{ st }}{{ user_q }}">{{ info[0] }}</a>
+  {% endfor %}
+</div>
+
+<div class="card flush">
+  {% if orders %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>№</th><th>Пользователь</th><th>Услуга</th><th>Статус</th><th class="num">Сумма</th><th>Создан</th></tr></thead>
+      <tbody>
+      {% for o in orders %}
+        <tr>
+          <td><a href="/orders/{{ o.id }}"><b>№{{ o.id }}</b></a></td>
+          <td><a href="/orders?user={{ o.user_id }}" class="mono">{{ o.user_id }}</a></td>
+          <td>{{ o.service.title }}</td>
+          <td>{{ ui.order_status(o.status.value) }}</td>
+          <td class="num">{{ o.final_price_stars }} ⭐</td>
+          <td class="muted">{{ o.created_at.strftime("%d.%m.%Y %H:%M") }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">Заказов нет</div>
+  {% endif %}
+</div>
 {% endblock %}

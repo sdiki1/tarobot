@@ -1,22 +1,53 @@
 {% extends "base.html" %}
+{% block title %}Главная{% endblock %}
 {% block content %}
-<h2>Панель управления</h2>
-<div class="stats">
-  <div class="stat"><b>{{ stats.users_total }}</b>Пользователей</div>
-  <div class="stat"><b>{{ stats.users_week }}</b>Новых за 7 дней</div>
-  <div class="stat"><b>{{ stats.orders_total }}</b>Заказов</div>
-  <div class="stat"><b>{{ stats.payments_ok }}</b>Успешных оплат</div>
-  <div class="stat"><b>{{ stats.refunds }}</b>Возвратов</div>
-  <div class="stat"><b>{{ stats.stars_sum }} ⭐</b>Сумма оплат</div>
-  <div class="stat"><b>{{ stats.jobs_active }}</b>Активных заданий</div>
-  <div class="stat"><b>{{ stats.jobs_failed }}</b>Ошибочных заданий</div>
-  <div class="stat"><b>${{ "%.2f"|format(stats.ai_cost_month) }}</b>Расходы ИИ (месяц)</div>
+<div class="page-head">
+  <div><h1>Панель управления</h1><p>Сводка по боту на сегодня</p></div>
 </div>
-<div class="card" style="margin-top:16px">
-  <h3>Экспорт</h3>
-  {% for e in ["users","orders","payments","refunds","ai_costs","promo_activations"] %}
-    <a href="/export/{{e}}.csv">{{e}}.csv</a> · <a href="/export/{{e}}.xlsx">{{e}}.xlsx</a><br>
-  {% endfor %}
-  <p>Фильтр по периоду: добавьте <code>?date_from=2026-01-01&date_to=2026-02-01</code></p>
+
+{% macro stat(ico, value, label, mod="") %}
+  <div class="stat {{ mod }}">
+    <div class="stat-ico">{{ ico }}</div>
+    <div><div class="stat-value">{{ value }}</div><div class="stat-label">{{ label }}</div></div>
+  </div>
+{% endmacro %}
+
+<div class="stats">
+  {{ stat("👥", stats.users_total, "Пользователей всего") }}
+  {{ stat("🌱", "+" ~ stats.users_week, "Новых за 7 дней", "good") }}
+  {{ stat("📦", stats.orders_total, "Заказов") }}
+  {{ stat("⭐", stats.stars_sum, "Stars получено", "good") }}
+  {{ stat("💳", stats.payments_ok, "Успешных оплат") }}
+  {{ stat("↩️", stats.refunds, "Возвратов", "warn" if stats.refunds else "") }}
+  {{ stat("⏳", stats.jobs_active, "Генерируется сейчас") }}
+  {{ stat("⚠️", stats.jobs_failed, "Генераций с ошибкой", "warn" if stats.jobs_failed else "") }}
+  {{ stat("🤖", "$%.2f"|format(stats.ai_cost_month), "Расходы на ИИ в этом месяце") }}
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <div><h2>Выгрузка данных</h2><p>CSV — для любых таблиц, XLSX — для Excel. Период можно не указывать.</p></div>
+  </div>
+  <form method="get" action="/export/users.csv">
+    <div class="grid-4" style="margin-bottom:16px">
+      <div class="field"><label for="date_from">С даты</label><input type="date" id="date_from" name="date_from"></div>
+      <div class="field"><label for="date_to">По дату</label><input type="date" id="date_to" name="date_to"></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <tbody>
+        {% for key, title in [("users", "Пользователи"), ("orders", "Заказы"), ("payments", "Платежи"), ("refunds", "Возвраты"), ("ai_costs", "Расходы на ИИ"), ("promo_activations", "Активации промокодов")] %}
+          <tr>
+            <td><b>{{ title }}</b></td>
+            <td class="actions">
+              <button class="secondary sm" formaction="/export/{{ key }}.csv">CSV</button>
+              <button class="secondary sm" formaction="/export/{{ key }}.xlsx">XLSX</button>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
 </div>
 {% endblock %}

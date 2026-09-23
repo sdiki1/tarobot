@@ -30,10 +30,13 @@ async def consent_kb(session: AsyncSession) -> InlineKeyboardMarkup:
     ]])
 
 
-def promo_kb(order_id: int | None = None, test_payment: bool = False) -> InlineKeyboardMarkup:
+async def promo_kb(session: AsyncSession, order_id: int | None = None,
+                   test_payment: bool = False) -> InlineKeyboardMarkup:
     buttons = [
-        [InlineKeyboardButton(text="🎟 Ввести промокод", callback_data="promo:enter")],
-        [InlineKeyboardButton(text="💳 Перейти к оплате", callback_data="promo:skip")],
+        [InlineKeyboardButton(text=await get_setting(session, "btn_promo_enter"),
+                              callback_data="promo:enter")],
+        [InlineKeyboardButton(text=await get_setting(session, "btn_pay"),
+                              callback_data="promo:skip")],
     ]
     if test_payment and order_id is not None:
         buttons.append([InlineKeyboardButton(

@@ -1,47 +1,95 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Заказ №{{ o.id }}{% endblock %}
 {% block content %}
-<h2>Заказ №{{ o.id }}</h2>
-<div class="card">
-  <p><b>Пользователь:</b> {{ o.user_id }} · <b>Услуга:</b> {{ o.service.title }} ·
-     <b>Статус:</b> {{ o.status.value }} · <b>Сумма:</b> {{ o.final_price_stars }} ⭐</p>
-  <p><b>Модель:</b> {{ o.model_used or "—" }} · <b>Версия промпта:</b> {{ o.prompt_version_id or "—" }} ·
-     <b>Попыток генерации:</b> {{ job.attempts if job else "—" }} ({{ job.status.value if job else "нет задания" }})</p>
-  <p><b>Входные данные:</b></p><pre>{{ input_json }}</pre>
-  {% if payment %}
-  <p><b>Платёж:</b> {{ payment.amount_stars }} {{ payment.currency }},
-     charge_id: <code>{{ payment.telegram_payment_charge_id }}</code>,
-     статус: {{ payment.status }}, {{ payment.created_at.strftime("%d.%m.%Y %H:%M") }}
-     {% if payment.refunded_at %}· возврат {{ payment.refunded_at.strftime("%d.%m.%Y") }}: {{ payment.refund_reason }}{% endif %}</p>
-  {% endif %}
-  {% if job and job.last_error %}<p><b>Последняя ошибка:</b> {{ job.last_error }}</p>{% endif %}
+<div class="page-head">
+  <div>
+    <a href="/orders" class="small">← Все заказы</a>
+    <h1 style="margin-top:6px">Заказ №{{ o.id }} {{ ui.order_status(o.status.value) }}</h1>
+  </div>
+  <div class="btn-row">
+    <form class="inline" method="post" action="/orders/{{ o.id }}/retry"><button class="secondary">🔁 Повторить генерацию</button></form>
+    <form class="inline" method="post" action="/orders/{{ o.id }}/resend"><button class="secondary">📤 Отправить результат ещё раз</button></form>
+    <form class="inline" method="post" action="/orders/{{ o.id }}/cancel"
+          onsubmit="return confirm('Отменить задание генерации?')"><button class="danger">Отменить задание</button></form>
+  </div>
 </div>
 
 <div class="card">
-  <form class="inline" method="post" action="/orders/{{ o.id }}/retry"><button>🔁 Повторить генерацию</button></form>
-  <form class="inline" method="post" action="/orders/{{ o.id }}/resend"><button>📤 Отправить результат ещё раз</button></form>
-  <form class="inline" method="post" action="/orders/{{ o.id }}/cancel"><button class="danger">Отменить задание</button></form>
-  {% if payment and payment.status == "paid" %}
-  <form class="inline" method="post" action="/orders/{{ o.id }}/refund"
-        onsubmit="return confirm('Выполнить возврат {{ payment.amount_stars }} ⭐?')">
-    <input name="reason" placeholder="Причина возврата" style="width:220px;display:inline-block">
-    <button class="danger">💫 Возврат Stars</button>
-  </form>
-  {% endif %}
+  <dl class="kv">
+    <div><dt>Пользователь</dt><dd><a href="/orders?user={{ o.user_id }}" class="mono">{{ o.user_id }}</a></dd></div>
+    <div><dt>Услуга</dt><dd>{{ o.service.title }}</dd></div>
+    <div><dt>Сумма</dt><dd>{{ o.final_price_stars }} ⭐{% if o.final_price_stars != o.price_stars %} <span class="muted small">(без скидки {{ o.price_stars }})</span>{% endif %}</dd></div>
+    <div><dt>Создан</dt><dd>{{ o.created_at.strftime("%d.%m.%Y %H:%M") }}</dd></div>
+    <div><dt>Модель ИИ</dt><dd>{{ o.model_used or "—" }}</dd></div>
+    <div><dt>Версия инструкции</dt><dd>{{ o.prompt_version_id or "—" }}</dd></div>
+    <div><dt>Генерация</dt><dd>{% if job %}{{ ui.job_status(job.status.value) }} <span class="muted small">попыток: {{ job.attempts }}</span>{% else %}—{% endif %}</dd></div>
+  </dl>
+  {% if job and job.last_error %}<div class="alert error" style="margin:16px 0 0">Последняя ошибка: {{ job.last_error }}</div>{% endif %}
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Входные данные</h2></div>
+    <pre>{{ input_json }}</pre>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Оплата</h2></div>
+    {% if payment %}
+      <dl class="kv">
+        <div><dt>Сумма</dt><dd>{{ payment.amount_stars }} {{ payment.currency }}</dd></div>
+        <div><dt>Статус</dt><dd>{% if payment.status == "refunded" %}<span class="badge violet">Возврат</span>{% elif payment.status == "test" %}<span class="badge yellow">Тестовая</span>{% else %}<span class="badge green">Оплачен</span>{% endif %}</dd></div>
+        <div><dt>Дата</dt><dd>{{ payment.created_at.strftime("%d.%m.%Y %H:%M") }}</dd></div>
+        <div style="grid-column:1/-1"><dt>charge_id</dt><dd class="mono small">{{ payment.telegram_payment_charge_id }}</dd></div>
+        {% if payment.refunded_at %}
+          <div style="grid-column:1/-1"><dt>Возврат {{ payment.refunded_at.strftime("%d.%m.%Y") }}</dt><dd>{{ payment.refund_reason or "—" }}</dd></div>
+        {% endif %}
+      </dl>
+      {% if payment.status == "paid" %}
+        <form method="post" action="/orders/{{ o.id }}/refund" style="margin-top:16px"
+              onsubmit="return confirm('Вернуть пользователю {{ payment.amount_stars }} ⭐?')">
+          <div class="btn-row">
+            <input type="text" name="reason" placeholder="Причина возврата" style="flex:1;min-width:180px">
+            <button class="danger">💫 Вернуть Stars</button>
+          </div>
+        </form>
+      {% endif %}
+    {% else %}
+      <p class="muted">Оплаты нет</p>
+    {% endif %}
+  </div>
 </div>
 
 <div class="card">
   <form method="post" action="/orders/{{ o.id }}/comment">
-    <label>Внутренний комментарий
-      <textarea name="comment" rows="2">{{ o.admin_comment or "" }}</textarea></label>
-    <button>Сохранить комментарий</button>
+    <div class="field">
+      <label for="comment">Внутренний комментарий</label>
+      <textarea id="comment" name="comment" rows="2" placeholder="Видят только администраторы">{{ o.admin_comment or "" }}</textarea>
+    </div>
+    <div class="form-actions"><button class="secondary">Сохранить комментарий</button></div>
   </form>
 </div>
 
-{% if result %}<div class="card"><h3>Результат</h3><pre style="white-space:pre-wrap">{{ result.text }}</pre></div>{% endif %}
+{% if result %}
+<div class="card">
+  <div class="card-head"><div><h2>Результат</h2><p>Так его видит пользователь</p></div></div>
+  <div class="tg" style="white-space:pre-wrap">{{ result.text|tg_html }}</div>
+</div>
+{% endif %}
+
 {% if errors %}
-<div class="card"><h3>Ошибки по заказу</h3>
-<table><tr><th>Когда</th><th>Тип</th><th>Сообщение</th></tr>
-{% for e in errors %}<tr><td>{{ e.created_at.strftime("%d.%m %H:%M") }}</td><td>{{ e.error_type }}</td><td>{{ e.message }}</td></tr>{% endfor %}
-</table></div>
+<div class="card flush">
+  <div class="card-head"><h2>Ошибки по заказу</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Когда</th><th>Тип</th><th>Сообщение</th></tr></thead>
+      <tbody>
+      {% for e in errors %}
+        <tr><td class="muted">{{ e.created_at.strftime("%d.%m %H:%M") }}</td><td>{{ e.error_type }}</td><td>{{ e.message }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endif %}
 {% endblock %}

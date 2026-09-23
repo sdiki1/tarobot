@@ -1,38 +1,144 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ s.title if s and s.title else "Новая услуга" }}{% endblock %}
 {% block content %}
-<h2>{{ "Услуга: " ~ s.title if s else "Новая услуга" }}</h2>
-<form method="post" action="/services/{{ s.id if s else 0 }}" class="card">
-  <label>Код (латиницей) <input name="code" value="{{ s.code if s else '' }}" required></label>
-  <label>Тип
-    <select name="type">
-      <option value="tarot" {{ "selected" if s and s.type.value=="tarot" }}>Таро</option>
-      <option value="natal" {{ "selected" if s and s.type.value=="natal" }}>Натальная карта</option>
-    </select></label>
-  <label>Название <input name="title" value="{{ s.title if s else '' }}" required></label>
-  <label>Описание (HTML Telegram; у натальной услуги описание, начинающееся с &lt;b&gt;заголовка&lt;/b&gt;, выводится без названия)
-    <textarea name="description" rows="8">{{ s.description if s else '' }}</textarea></label>
-  <label>Кнопка в карточке натальной услуги (пусто — общая кнопка из настроек)
-    <input name="button_text" value="{{ (s.button_text or '') if s else '' }}" maxlength="64"></label>
-  <label>Цена (Stars) <input type="number" name="price_stars" value="{{ s.price_stars if s else 50 }}" min="1" required></label>
-  <label>Количество карт <input type="number" name="cards_count" value="{{ s.cards_count if s else 1 }}" min="0" max="10"></label>
-  <label>Позиции расклада (через запятую)
-    <input name="positions" value="{{ s.positions|join(', ') if s else '' }}"></label>
-  <label><input type="checkbox" name="requires_question" value="true"
-    {{ "checked" if not s or s.requires_question }} style="width:auto"> Требуется вопрос пользователя</label>
-  <label>Обязательные поля (Таро: question, name, birth_date, partner_name, situation, comment; натальная карта: partner — данные второго человека, transits — транзиты на год)
-    <input name="required_fields" value="{{ s.required_fields|join(', ') if s else '' }}"></label>
-  <label><input type="checkbox" name="allow_reversed" value="true"
-    {{ "checked" if not s or s.allow_reversed }} style="width:auto"> Перевёрнутые карты</label>
-  <label>Максимум символов ответа <input type="number" name="max_output_chars" value="{{ s.max_output_chars if s else 4000 }}"></label>
-  <label>Лимит заказов на пользователя в сутки <input type="number" name="per_user_daily_limit" value="{{ s.per_user_daily_limit if s else 10 }}"></label>
-  <label><input type="checkbox" name="is_active" value="true"
-    {{ "checked" if not s or s.is_active }} style="width:auto"> Услуга активна</label>
-  <label>Порядок отображения <input type="number" name="sort_order" value="{{ s.sort_order if s else 100 }}"></label>
-  <h3>Промпт ИИ {% if p %}(версия {{ p.version }}){% endif %}</h3>
-  <label>Системная инструкция <textarea name="system_prompt" rows="5">{{ p.system_prompt if p else '' }}</textarea></label>
-  <label>Шаблон запроса ({facts}, {question}) <textarea name="user_prompt_template" rows="5">{{ p.user_prompt_template if p else '' }}</textarea></label>
-  <label>Запрещённые темы <textarea name="forbidden_topics" rows="2">{{ p.forbidden_topics if p else '' }}</textarea></label>
-  <label>Требования к стилю <textarea name="style_requirements" rows="2">{{ p.style_requirements if p else '' }}</textarea></label>
-  <button type="submit">Сохранить</button>
+<div class="page-head">
+  <div>
+    <a href="/services" class="small">← Все услуги</a>
+    <h1 style="margin-top:6px">{{ s.title if s and s.title else "Новая услуга" }}</h1>
+  </div>
+</div>
+
+{% if errors %}<div class="alert error">Услуга не сохранена — исправьте поля, отмеченные красным.</div>{% endif %}
+
+<form method="post" action="/services/{{ s.id if s and s.id else 0 }}" data-guard>
+  <div class="card">
+    <div class="card-head"><h2>Основное</h2></div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="title">Название</label>
+        <input type="text" id="title" name="title" value="{{ s.title if s else '' }}" required>
+        <div class="hint">Надпись на кнопке в меню бота, заголовок счёта и результата.</div>
+      </div>
+      <div class="field">
+        <label for="code">Код (латиницей)</label>
+        <input type="text" id="code" name="code" value="{{ s.code if s else '' }}" required>
+        <div class="hint">Служебное имя, по нему услугу находят обновления бота. Лучше не менять.</div>
+      </div>
+    </div>
+    <div class="grid-4">
+      <div class="field">
+        <label for="type">Раздел</label>
+        <select id="type" name="type">
+          <option value="tarot" {{ "selected" if s and s.type.value == "tarot" }}>Расклады Таро</option>
+          <option value="natal" {{ "selected" if s and s.type.value == "natal" }}>Натальная карта</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="price_stars">Цена, ⭐</label>
+        <input type="number" id="price_stars" name="price_stars" value="{{ s.price_stars if s else 50 }}" min="1" required>
+      </div>
+      <div class="field">
+        <label for="per_user_daily_limit">Заказов в сутки на человека</label>
+        <input type="number" id="per_user_daily_limit" name="per_user_daily_limit" value="{{ s.per_user_daily_limit if s else 10 }}" min="0">
+      </div>
+      <div class="field">
+        <label for="sort_order">Порядок в меню</label>
+        <input type="number" id="sort_order" name="sort_order" value="{{ s.sort_order if s else 100 }}">
+      </div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" name="is_active" value="true" {{ "checked" if not s or s.is_active }}>
+      <span class="track"></span> Услуга доступна пользователям
+    </label>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div><h2>Карточка услуги</h2><p>Что видит пользователь, открыв услугу. Строка с ценой добавляется в конце автоматически.</p></div>
+    </div>
+    <div class="field{{ ' has-error' if errors.description }}">
+      <label>Описание</label>
+      {{ ui.rich_editor("description", s.description if s else "", limit=4000, tall=True,
+                        show_source=errors.description) }}
+      <div class="hint">У натальных услуг описание, которое начинается с жирной строки, показывается без названия сверху — эта строка становится заголовком.</div>
+      {{ ui.errors_list(errors.description) }}
+    </div>
+    <div class="field">
+      <label for="button_text">Надпись на кнопке под карточкой (натальная карта)</label>
+      <input type="text" id="button_text" name="button_text" maxlength="64" value="{{ (s.button_text or '') if s else '' }}"
+             placeholder="Пусто — общая кнопка из раздела «Тексты бота»">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Параметры</h2></div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="cards_count">Количество карт Таро</label>
+        <input type="number" id="cards_count" name="cards_count" value="{{ s.cards_count if s else 1 }}" min="0" max="10">
+        <div class="hint">Для натальной карты — 0.</div>
+      </div>
+      <div class="field">
+        <label for="max_output_chars">Максимум символов в ответе ИИ</label>
+        <input type="number" id="max_output_chars" name="max_output_chars" value="{{ s.max_output_chars if s else 4000 }}">
+      </div>
+    </div>
+    <div class="field">
+      <label for="positions">Позиции расклада (через запятую)</label>
+      <input type="text" id="positions" name="positions" value="{{ s.positions|join(', ') if s else '' }}" placeholder="Прошлое, Настоящее, Будущее">
+    </div>
+    <div class="field">
+      <label for="required_fields">Что спросить у пользователя (через запятую)</label>
+      <input type="text" id="required_fields" name="required_fields" value="{{ s.required_fields|join(', ') if s else '' }}">
+      <div class="hint">Таро: question, name, birth_date, partner_name, situation, comment. Натальная карта: partner — данные второго человека, transits — транзиты на год.</div>
+    </div>
+    <div class="btn-row" style="gap:24px">
+      <label class="switch">
+        <input type="checkbox" name="requires_question" value="true" {{ "checked" if not s or s.requires_question }}>
+        <span class="track"></span> Нужен вопрос пользователя
+      </label>
+      <label class="switch">
+        <input type="checkbox" name="allow_reversed" value="true" {{ "checked" if not s or s.allow_reversed }}>
+        <span class="track"></span> Перевёрнутые карты
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <h2>Инструкция для ИИ {% if p and p.version %}<span class="badge">версия {{ p.version }}</span>{% endif %}</h2>
+        <p>При каждом изменении сохраняется новая версия; в заказе видно, по какой версии он выполнен.</p>
+      </div>
+    </div>
+    <div class="field">
+      <label for="system_prompt">Системная инструкция</label>
+      <textarea id="system_prompt" name="system_prompt" rows="6">{{ p.system_prompt if p else '' }}</textarea>
+    </div>
+    <div class="field">
+      <label for="user_prompt_template">Шаблон запроса</label>
+      <textarea id="user_prompt_template" name="user_prompt_template" rows="5">{{ p.user_prompt_template if p else '' }}</textarea>
+      <div class="hint"><code>{facts}</code> — карты или расчёт натальной карты, <code>{question}</code> — вопрос пользователя.</div>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="forbidden_topics">Запрещённые темы</label>
+        <textarea id="forbidden_topics" name="forbidden_topics" rows="3">{{ p.forbidden_topics if p else '' }}</textarea>
+      </div>
+      <div class="field">
+        <label for="style_requirements">Требования к стилю</label>
+        <textarea id="style_requirements" name="style_requirements" rows="3">{{ p.style_requirements if p else '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="sticky-actions">
+    <div class="form-actions">
+      <span class="muted" data-dirty-note hidden>Есть несохранённые изменения</span>
+      <a class="btn secondary" href="/services">Отмена</a>
+      <button type="submit">Сохранить услугу</button>
+    </div>
+  </div>
 </form>
 {% endblock %}

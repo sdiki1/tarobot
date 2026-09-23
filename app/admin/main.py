@@ -4,7 +4,9 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,10 +18,47 @@ from app.config import get_settings
 from app.db.models import (
     AIRequest, GenerationJob, JobStatus, Order, OrderStatus, Payment, User,
 )
+from app.services.telegram_html import clean_telegram_html, visible_text
+from app.services.texts import ALERT_LIMIT, PLACEHOLDERS
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="Taro Bot Admin", docs_url=None, redoc_url=None)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 app.state.templates = templates
+
+templates.env.globals.update(
+    NAV=[
+        ("/", "📊", "Главная"),
+        ("/services", "🧾", "Услуги"),
+        ("/orders", "📦", "Заказы"),
+        ("/users", "👥", "Пользователи"),
+        ("/promos", "🎟", "Промокоды"),
+        ("/broadcasts", "📣", "Рассылки"),
+        ("/settings", "✏️", "Тексты бота"),
+        ("/errors", "⚠️", "Ошибки"),
+    ],
+    # статус -> (подпись, цвет бейджа)
+    ORDER_STATUS={
+        "created": ("Создан", ""), "invoiced": ("Ждёт оплаты", "yellow"),
+        "paid": ("Оплачен", "blue"), "completed": ("Готов", "green"),
+        "failed": ("Ошибка", "red"), "refunded": ("Возврат", "violet"),
+        "cancelled": ("Отменён", ""),
+    },
+    JOB_STATUS={
+        "queued": ("В очереди", ""), "processing": ("Выполняется", "blue"),
+        "retrying": ("Повтор", "yellow"), "completed": ("Готово", "green"),
+        "failed": ("Ошибка", "red"), "cancelled": ("Отменено", ""),
+    },
+    PLACEHOLDERS=PLACEHOLDERS,
+    ALERT_LIMIT=ALERT_LIMIT,
+    # сбрасывает кеш браузера при обновлении стилей и скриптов
+    static_version=int(max(f.stat().st_mtime for f in STATIC_DIR.iterdir())),
+)
+# Текст Telegram как HTML страницы: разрешённые теги, всё остальное экранировано
+templates.env.filters["tg_html"] = lambda text: Markup(clean_telegram_html(text or "")[0])
+templates.env.filters["tg_plain"] = visible_text
 
 app.include_router(routes.router)
 app.include_router(export.router)

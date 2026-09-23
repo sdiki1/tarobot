@@ -2,6 +2,7 @@
 рассылки, ошибки, настройки."""
 import json
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 from aiogram import Bot
 from arq import create_pool
@@ -18,7 +19,8 @@ from app.db.models import (
     OrderStatus, Payment, PromoCode, Refund, Result, Service, ServicePrompt,
     ServiceType, User,
 )
-from app.services.texts import DEFAULTS, get_setting, set_setting
+from app.services.telegram_html import clean_telegram_html
+from app.services.texts import DEFAULTS, TEXT_GROUPS, TEXTS, get_setting, save_text, validate_text
 
 router = APIRouter(dependencies=[Depends(current_admin)])
 
@@ -41,11 +43,13 @@ def _bot() -> Bot:
 # ---------- Услуги ----------
 
 @router.get("/services", response_class=HTMLResponse)
-async def services_list(request: Request, session: AsyncSession = Depends(get_db)):
+async def services_list(request: Request, saved: str = "",
+                        session: AsyncSession = Depends(get_db)):
     services = (await session.scalars(
         select(Service).where(Service.is_archived.is_(False)).order_by(Service.sort_order)
     )).all()
-    return tpl(request).TemplateResponse(request, "services.html", {"services": services})
+    return tpl(request).TemplateResponse(
+        request, "services.html", {"services": services, "saved": saved})
 
 
 @router.get("/services/{service_id}", response_class=HTMLResponse)
@@ -57,7 +61,7 @@ async def service_edit(request: Request, service_id: int,
                                     ServicePrompt.is_current.is_(True))
         .order_by(ServicePrompt.version.desc())) if service else None
     return tpl(request).TemplateResponse(
-        request, "service_form.html", {"s": service, "p": prompt})
+        request, "service_form.html", {"s": service, "p": prompt, "errors": {}})
 
 
 @router.post("/services/{service_id}")
@@ -84,7 +88,7 @@ async def service_save(
     service.code = code
     service.type = ServiceType(type_)
     service.title = title
-    service.description = description
+    service.description, description_errors = clean_telegram_html(description.strip())
     service.button_text = button_text.strip()[:64] or None
     service.price_stars = price_stars
     service.cards_count = cards_count
@@ -96,6 +100,18 @@ async def service_save(
     service.per_user_daily_limit = per_user_daily_limit
     service.is_active = is_active
     service.sort_order = sort_order
+    if description_errors:
+        # Показываем форму с введёнными данными; без commit изменения не сохраняются
+        prompt = SimpleNamespace(
+            version=None, system_prompt=system_prompt, user_prompt_template=user_prompt_template,
+            forbidden_topics=forbidden_topics, style_requirements=style_requirements,
+        )
+        service.description = description
+        return tpl(request).TemplateResponse(
+            request, "service_form.html",
+            {"s": service, "p": prompt, "errors": {"description": description_errors}},
+            status_code=400,
+        )
     await session.flush()
 
     # Новая версия промпта при изменении текста
@@ -120,7 +136,7 @@ async def service_save(
         await audit(session, admin, "price_change", "service", service.id,
                     {"old": old_price, "new": price_stars})
     await session.commit()
-    return RedirectResponse("/services", status_code=302)
+    return RedirectResponse("/services?saved=1", status_code=302)
 
 
 @router.post("/services/{service_id}/archive")
@@ -137,14 +153,17 @@ async def service_archive(service_id: int, session: AsyncSession = Depends(get_d
 # ---------- Заказы ----------
 
 @router.get("/orders", response_class=HTMLResponse)
-async def orders_list(request: Request, status: str = "",
+async def orders_list(request: Request, status: str = "", user: str = "",
                       session: AsyncSession = Depends(get_db)):
     stmt = select(Order).order_by(Order.created_at.desc()).limit(200)
     if status:
         stmt = stmt.where(Order.status == OrderStatus(status))
+    if user.isdigit():
+        stmt = stmt.where(Order.user_id == int(user))
     orders = (await session.scalars(stmt)).all()
     return tpl(request).TemplateResponse(
-        request, "orders.html", {"orders": orders, "status": status})
+        request, "orders.html",
+        {"orders": orders, "status": status, "user": user if user.isdigit() else ""})
 
 
 @router.get("/orders/{order_id}", response_class=HTMLResponse)
@@ -335,30 +354,53 @@ AUDIENCES = {
 }
 
 
-@router.get("/broadcasts", response_class=HTMLResponse)
-async def broadcasts_list(request: Request, session: AsyncSession = Depends(get_db)):
+async def _broadcasts_page(request: Request, session: AsyncSession, form: dict | None = None,
+                           errors: list[str] | None = None, toast: str = "",
+                           status_code: int = 200):
     items = (await session.scalars(
         select(Broadcast).order_by(Broadcast.id.desc()).limit(50))).all()
-    return tpl(request).TemplateResponse(
-        request, "broadcasts.html", {"items": items, "audiences": AUDIENCES})
+    form = form or {"text": "", "audience": "all", "button_text": "", "button_url": ""}
+    return tpl(request).TemplateResponse(request, "broadcasts.html", {
+        "items": items, "audiences": AUDIENCES, "form": form,
+        "errors": errors or [], "toast": toast,
+    }, status_code=status_code)
+
+
+@router.get("/broadcasts", response_class=HTMLResponse)
+async def broadcasts_list(request: Request, started: str = "",
+                          session: AsyncSession = Depends(get_db)):
+    return await _broadcasts_page(request, session,
+                                  toast="Рассылка запущена" if started else "")
 
 
 @router.post("/broadcasts")
 async def broadcast_create(
+    request: Request,
     session: AsyncSession = Depends(get_db), admin=Depends(current_admin),
-    text: str = Form(), audience: str = Form("all"),
+    text: str = Form(""), audience: str = Form("all"),
     button_text: str = Form(""), button_url: str = Form(""),
     test_only: bool = Form(False),
 ):
+    form = {"text": text, "audience": audience,
+            "button_text": button_text, "button_url": button_url}
+    text, errors = clean_telegram_html(text.strip())
+    if not text:
+        errors.append("Напишите текст рассылки.")
+    if errors:
+        return await _broadcasts_page(request, session, form, errors, status_code=400)
+    form["text"] = text
+
     buttons = [{"text": button_text, "url": button_url}] if button_text and button_url else []
     if test_only:
         bot = _bot()
         try:
             for admin_id in get_settings().admin_ids:
-                await bot.send_message(admin_id, f"[ТЕСТ РАССЫЛКИ]\n\n{text}")
+                await bot.send_message(admin_id, f"[ТЕСТ РАССЫЛКИ]\n\n{text}",
+                                       parse_mode="HTML")
         finally:
             await bot.session.close()
-        return RedirectResponse("/broadcasts", status_code=302)
+        return await _broadcasts_page(request, session, form,
+                                      toast="Тест отправлен администраторам")
 
     bc = Broadcast(text=text, buttons=buttons, audience_filter={"type": audience})
     session.add(bc)
@@ -377,7 +419,7 @@ async def broadcast_create(
     await audit(session, admin, "broadcast_start", "broadcast", bc.id)
     await session.commit()
     await _enqueue("send_broadcast", bc.id, job_id=f"broadcast-{bc.id}")
-    return RedirectResponse("/broadcasts", status_code=302)
+    return RedirectResponse("/broadcasts?started=1", status_code=302)
 
 
 # ---------- Ошибки ----------
@@ -399,21 +441,44 @@ async def error_resolve(error_id: int, comment: str = Form(""),
     return RedirectResponse("/errors", status_code=302)
 
 
-# ---------- Настройки и тексты ----------
+# ---------- Тексты бота и настройки ----------
+
+async def _settings_page(request: Request, session: AsyncSession, overrides: dict | None = None,
+                         errors: dict | None = None, saved: str = "", status_code: int = 200):
+    values = {k: await get_setting(session, k) for k in DEFAULTS}
+    values.update(overrides or {})
+    return tpl(request).TemplateResponse(request, "settings.html", {
+        "groups": TEXT_GROUPS, "values": values, "errors": errors or {}, "saved": saved,
+    }, status_code=status_code)
+
 
 @router.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request, session: AsyncSession = Depends(get_db)):
-    values = {k: await get_setting(session, k) for k in DEFAULTS}
-    return tpl(request).TemplateResponse(request, "settings.html", {"values": values})
+async def settings_page(request: Request, saved: str = "",
+                        session: AsyncSession = Depends(get_db)):
+    return await _settings_page(request, session, saved=saved)
 
 
 @router.post("/settings")
 async def settings_save(request: Request, session: AsyncSession = Depends(get_db),
                         admin=Depends(current_admin)):
     form = await request.form()
-    for key in DEFAULTS:
-        if key in form:
-            await set_setting(session, key, str(form[key]))
-    await audit(session, admin, "settings_change")
+    submitted, errors = {}, {}
+    for key, item in TEXTS.items():
+        if key not in form:
+            continue
+        raw = "true" if item.kind == "flag" and "true" in form.getlist(key) else str(form[key])
+        value, problems = validate_text(item, raw)
+        submitted[key] = value if not problems else raw
+        if problems:
+            errors[key] = problems
+    if errors:
+        return await _settings_page(request, session, submitted, errors, status_code=400)
+
+    changed = [key for key, value in submitted.items()
+               if value != await get_setting(session, key)]
+    for key in changed:
+        await save_text(session, key, submitted[key])
+    if changed:
+        await audit(session, admin, "settings_change", details={"keys": changed})
     await session.commit()
-    return RedirectResponse("/settings", status_code=302)
+    return RedirectResponse("/settings?saved=1", status_code=302)

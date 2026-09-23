@@ -26,7 +26,7 @@ from app.db.session import SessionMaker
 from app.natal.calc import calculate_natal, calculate_transits, synastry_aspects
 from app.services.errors import log_error
 from app.services.formatting import markdown_to_telegram_html
-from app.services.texts import get_setting
+from app.services.texts import get_setting, get_text
 from app.tarot.draw import draw_cards
 
 log = logging.getLogger(__name__)
@@ -265,11 +265,8 @@ async def generate_result(ctx: dict, order_id: int) -> None:
                 f"{str(e)[:200]}"
             )
             try:
-                await bot.send_message(
-                    order.user_id,
-                    "К сожалению, при формировании результата произошла ошибка. "
-                    "Мы уже разбираемся; поддержка: /paysupport",
-                )
+                await bot.send_message(order.user_id,
+                                       await get_text(session, "generation_failed"))
             except Exception:
                 pass
         finally:
@@ -300,7 +297,7 @@ async def send_broadcast(ctx: dict, broadcast_id: int) -> None:
 
         buttons = [[InlineKeyboardButton(text=b["text"], url=b["url"])]
                    for b in (bc.buttons or []) if b.get("url")]
-        buttons.append([InlineKeyboardButton(text="🔕 Отписаться",
+        buttons.append([InlineKeyboardButton(text=await get_setting(session, "btn_unsubscribe"),
                                              callback_data="unsub:broadcast")])
         kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
