@@ -58,17 +58,25 @@ async def natal_menu(message: Message, state: FSMContext, session: AsyncSession)
     await message.answer(await get_setting(session, "natal_menu_text"), reply_markup=kb)
 
 
+def _card_text(service: Service) -> str:
+    """Описание со своим заголовком (<b>…</b> в начале) выводится без названия услуги."""
+    description = service.description.strip()
+    if not description.startswith("<b>"):
+        description = f"<b>{service.title}</b>\n\n{description}"
+    return f"{description}\n\nСтоимость: {service.price_stars} ⭐"
+
+
 @router.callback_query(F.data.startswith("natal:"))
 async def natal_service_card(cb: CallbackQuery, session: AsyncSession):
-    """Краткое описание услуги и кнопка «РАССЧИТАТЬ»."""
+    """Описание услуги и кнопка «РАССЧИТАТЬ» (или своя кнопка услуги)."""
     service = await session.get(Service, int(cb.data.split(":")[1]))
     if not _active_natal(service):
         await cb.answer("Услуга недоступна", show_alert=True)
         return
-    text = (f"<b>{service.title}</b>\n\n{service.description}\n\n"
-            f"Стоимость: {service.price_stars} ⭐")
+    text = _card_text(service)
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
-        text=await get_setting(session, "btn_calculate") or "РАССЧИТАТЬ",
+        text=(service.button_text
+              or await get_setting(session, "btn_calculate") or "РАССЧИТАТЬ"),
         callback_data=f"natalgo:{service.id}",
     )]])
     await cb.answer()

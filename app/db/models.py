@@ -69,6 +69,8 @@ class Service(Base):
     type: Mapped[ServiceType] = mapped_column(Enum(ServiceType), default=ServiceType.tarot)
     title: Mapped[str] = mapped_column(String(128))
     description: Mapped[str] = mapped_column(Text, default="")
+    # Кнопка в карточке натальной услуги; пусто — общая кнопка btn_calculate из настроек
+    button_text: Mapped[str | None] = mapped_column(String(64))
     image_file_id: Mapped[str | None] = mapped_column(String(256))
     price_stars: Mapped[int] = mapped_column(Integer)
     cards_count: Mapped[int] = mapped_column(Integer, default=1)

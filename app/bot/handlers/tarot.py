@@ -1,4 +1,6 @@
 """Платные расклады Таро: каталог, сбор входных данных, промокод, счёт в Stars."""
+import html
+import re
 from datetime import datetime, timedelta, timezone
 
 from aiogram import F, Router
@@ -178,13 +180,24 @@ def invoice_title(title: str, limit: int = 32) -> str:
     return cut.rstrip(" ,.;:—-") + "…"
 
 
+def invoice_description(service: Service, limit: int = 240) -> str:
+    """Описание счёта: без HTML-разметки, обрезка по словам. Лимит Telegram — 255 символов,
+    запас — на эмодзи, которые считаются за два символа."""
+    text = html.unescape(re.sub(r"<[^>]+>", "", service.description or "")).strip()
+    text = text or service.title
+    if len(text) <= limit:
+        return text
+    cut = text[:limit - 1].rsplit(" ", 1)[0]
+    return cut.rstrip(" ,.;:—-\n") + "…"
+
+
 async def send_invoice(message: Message, session: AsyncSession, order: Order):
     """Счёт в Telegram Stars (валюта XTR, provider_token пустой)."""
     order.status = OrderStatus.invoiced
     await session.commit()
     await message.answer_invoice(
         title=invoice_title(order.service.title),
-        description=(order.service.description or order.service.title)[:255],
+        description=invoice_description(order.service),
         payload=f"order:{order.id}",
         currency="XTR",
         prices=[LabeledPrice(label=invoice_title(order.service.title),

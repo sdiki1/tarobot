@@ -65,7 +65,7 @@ async def service_save(
     request: Request, service_id: int,
     session: AsyncSession = Depends(get_db), admin=Depends(current_admin),
     code: str = Form(), type_: str = Form(alias="type"), title: str = Form(),
-    description: str = Form(""), price_stars: int = Form(),
+    description: str = Form(""), button_text: str = Form(""), price_stars: int = Form(),
     cards_count: int = Form(1), positions: str = Form(""),
     requires_question: bool = Form(False), required_fields: str = Form(""),
     allow_reversed: bool = Form(False), max_output_chars: int = Form(4000),
@@ -85,6 +85,7 @@ async def service_save(
     service.type = ServiceType(type_)
     service.title = title
     service.description = description
+    service.button_text = button_text.strip()[:64] or None
     service.price_stars = price_stars
     service.cards_count = cards_count
     service.positions = [p.strip() for p in positions.split(",") if p.strip()]

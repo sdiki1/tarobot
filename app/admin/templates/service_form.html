@@ -9,7 +9,10 @@
       <option value="natal" {{ "selected" if s and s.type.value=="natal" }}>Натальная карта</option>
     </select></label>
   <label>Название <input name="title" value="{{ s.title if s else '' }}" required></label>
-  <label>Описание <textarea name="description" rows="3">{{ s.description if s else '' }}</textarea></label>
+  <label>Описание (HTML Telegram; у натальной услуги описание, начинающееся с &lt;b&gt;заголовка&lt;/b&gt;, выводится без названия)
+    <textarea name="description" rows="8">{{ s.description if s else '' }}</textarea></label>
+  <label>Кнопка в карточке натальной услуги (пусто — общая кнопка из настроек)
+    <input name="button_text" value="{{ (s.button_text or '') if s else '' }}" maxlength="64"></label>
   <label>Цена (Stars) <input type="number" name="price_stars" value="{{ s.price_stars if s else 50 }}" min="1" required></label>
   <label>Количество карт <input type="number" name="cards_count" value="{{ s.cards_count if s else 1 }}" min="0" max="10"></label>
   <label>Позиции расклада (через запятую)
