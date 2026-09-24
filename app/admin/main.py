@@ -37,7 +37,6 @@ templates.env.globals.update(
         ("/promos", "🎟", "Промокоды"),
         ("/broadcasts", "📣", "Рассылки"),
         ("/settings", "✏️", "Тексты бота"),
-        ("/errors", "⚠️", "Ошибки"),
     ],
     # статус -> (подпись, цвет бейджа)
     ORDER_STATUS={

@@ -1,5 +1,5 @@
 """CRUD-маршруты админ-панели: услуги, заказы, пользователи, промокоды,
-рассылки, ошибки, настройки."""
+рассылки, тексты бота."""
 import json
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -420,25 +420,6 @@ async def broadcast_create(
     await session.commit()
     await _enqueue("send_broadcast", bc.id, job_id=f"broadcast-{bc.id}")
     return RedirectResponse("/broadcasts?started=1", status_code=302)
-
-
-# ---------- Ошибки ----------
-
-@router.get("/errors", response_class=HTMLResponse)
-async def errors_list(request: Request, session: AsyncSession = Depends(get_db)):
-    errors = (await session.scalars(
-        select(ErrorLog).order_by(ErrorLog.created_at.desc()).limit(100))).all()
-    return tpl(request).TemplateResponse(request, "errors.html", {"errors": errors})
-
-
-@router.post("/errors/{error_id}/resolve")
-async def error_resolve(error_id: int, comment: str = Form(""),
-                        session: AsyncSession = Depends(get_db)):
-    err = await session.get(ErrorLog, error_id)
-    err.is_resolved = True
-    err.admin_comment = comment
-    await session.commit()
-    return RedirectResponse("/errors", status_code=302)
 
 
 # ---------- Тексты бота и настройки ----------
